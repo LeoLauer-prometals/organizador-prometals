@@ -5,10 +5,10 @@
 // ════════════════════════════════════════════════════════════════
 window.ORGANIZADOR_CONFIG = {
   // "Project URL"
-  supabaseUrl: "NEXT_PUBLIC_SUPABASE_URL=https://zekppyhnjytypehrjjzm.supabase.co",
+     supabaseUrl: "https://zekppyhnjytypehrjjzm.supabase.co",
 
   // "anon public" key (pode ficar pública: quem protege os dados são as regras do schema.sql)
-  supabaseAnonKey: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_s2pgojjPbA7Kevulvbvg4w_BsBxnZ73",
+     supabaseAnonKey: "sb_publishable_…",
 
   // Se preenchido (ex.: "prometals.co"), a tela de cadastro só aceita e-mails desse domínio.
   // Para bloquear de verdade no servidor, ligue também o trecho opcional no schema.sql.
