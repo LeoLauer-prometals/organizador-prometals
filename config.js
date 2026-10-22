@@ -4,11 +4,8 @@
 //  Supabase → Project Settings → API
 // ════════════════════════════════════════════════════════════════
 window.ORGANIZADOR_CONFIG = {
-  // "Project URL"
-     supabaseUrl: "https://zekppyhnjytypehrjjzm.supabase.co",
-
-  // "anon public" key (pode ficar pública: quem protege os dados são as regras do schema.sql)
-     supabaseAnonKey: "sb_publishable_…",
+  supabaseUrl: "https://zekppyhnjytypehrjjzm.supabase.co",
+  supabaseAnonKey: "sb_publishable_s2pgojjPbA7Kevulvbvg4w_BsBxnZ73",
 
   // Se preenchido (ex.: "prometals.co"), a tela de cadastro só aceita e-mails desse domínio.
   // Para bloquear de verdade no servidor, ligue também o trecho opcional no schema.sql.
