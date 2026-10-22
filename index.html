@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Organizador de Demandas · Prometals</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Aviso quando o config.js ainda não foi preenchido -->
+<div class="setup" id="setup" hidden>
+  <h1>Falta configurar o Supabase</h1>
+  <p>Abra o arquivo <code>config.js</code> e preencha <code>supabaseUrl</code> e <code>supabaseAnonKey</code> com os dados do seu projeto (Supabase → Project Settings → API). O passo a passo completo está no <code>README.md</code>.</p>
+</div>
+
+<!-- Tela de entrada -->
+<div class="auth" id="auth" hidden>
+  <div class="auth-card">
+    <h1>Organizador de Demandas</h1>
+    <p class="sub">Prometals</p>
+
+    <div id="auth-main">
+      <div class="auth-switch">
+        <button type="button" id="mode-entrar" aria-pressed="true">Entrar</button>
+        <button type="button" id="mode-criar" aria-pressed="false">Criar conta</button>
+      </div>
+      <form id="form-auth" novalidate>
+        <label id="lbl-nome" hidden>Seu nome
+          <input class="field" id="auth-nome" autocomplete="name" maxlength="80" placeholder="Como os colegas vão te ver">
+        </label>
+        <label>E-mail
+          <input class="field" id="auth-email" type="email" autocomplete="email" required>
+        </label>
+        <label>Senha
+          <input class="field" id="auth-senha" type="password" autocomplete="current-password" minlength="6" required>
+        </label>
+        <button class="btn" type="submit" id="auth-btn">Entrar</button>
+        <button class="link-auth" type="button" id="auth-esqueci">Esqueci minha senha</button>
+        <p class="auth-msg" id="auth-msg" role="status"></p>
+      </form>
+      <div id="ms-wrap" hidden>
+        <div class="auth-or">ou</div>
+        <button class="btn-ms" type="button" id="auth-ms">
+          <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+          Entrar com Microsoft
+        </button>
+      </div>
+    </div>
+
+    <form id="form-nova-senha" hidden>
+      <label>Nova senha
+        <input class="field" id="nova-senha" type="password" autocomplete="new-password" minlength="6" required>
+      </label>
+      <button class="btn" type="submit">Salvar nova senha</button>
+      <p class="auth-msg" id="nova-msg" role="status"></p>
+    </form>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div>
+      <h1>Organizador de Demandas</h1>
+      <p class="today" id="today"></p>
+    </div>
+    <div class="user">
+      <div class="sync" id="sync" data-state="wait" role="status"><span class="dot"></span><span id="sync-text">Conectando…</span></div>
+      <span class="user-name" id="user-name"></span>
+      <button class="btn-sec" type="button" id="btn-sair">Sair</button>
+    </div>
+  </header>
+
+  <p class="banner" id="banner" hidden></p>
+
+  <nav class="tabs" role="tablist" aria-label="Abas do organizador">
+    <button class="tab" role="tab" id="tab-lembretes" data-tab="lembretes" aria-controls="panel-lembretes" aria-selected="false" tabindex="-1">
+      <span class="tab-mark"></span><span class="full">Lembretes</span><span class="short">Lembretes</span><span class="count" id="count-lembretes">–</span><span class="tab-alert" aria-hidden="true"></span>
+    </button>
+    <button class="tab" role="tab" id="tab-dia" data-tab="dia" aria-controls="panel-dia" aria-selected="false" tabindex="-1">
+      <span class="tab-mark"></span><span class="full">Demandas do dia</span><span class="short">Do dia</span><span class="count" id="count-dia">–</span><span class="tab-alert" aria-hidden="true"></span>
+    </button>
+    <button class="tab" role="tab" id="tab-terceiros" data-tab="terceiros" aria-controls="panel-terceiros" aria-selected="false" tabindex="-1">
+      <span class="tab-mark"></span><span class="full">Demandas de terceiros</span><span class="short">Terceiros</span><span class="count" id="count-terceiros">–</span><span class="tab-alert" aria-hidden="true"></span>
+    </button>
+    <button class="tab" role="tab" id="tab-calendario" data-tab="calendario" aria-controls="panel-calendario" aria-selected="false" tabindex="-1" aria-label="Calendário">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12.5" rx="2"/><path d="M3 8.5h14M7 2.8v3.4M13 2.8v3.4"/></svg>
+      <span class="full">Calendário</span><span class="short">Calendário</span>
+    </button>
+  </nav>
+
+  <!-- Lembretes -->
+  <section class="sheet" id="panel-lembretes" data-tab="lembretes" role="tabpanel" aria-labelledby="tab-lembretes" hidden>
+    <div class="sheet-head">
+      <div>
+        <h2>Lembretes</h2>
+        <p>Coisas que não podemos esquecer. Coloque uma data se tiver prazo.</p>
+      </div>
+    </div>
+    <form class="add" id="form-lembretes" autocomplete="off">
+      <label class="sr" for="in-lembretes">Título do novo lembrete</label>
+      <input class="field grow" id="in-lembretes" placeholder="Título, ex.: Renovar o seguro do carro" maxlength="280">
+      <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-lembretes"><label data-p="alta"><input type="radio" name="prio-lembretes" id="prio-lembretes-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-lembretes" id="prio-lembretes-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-lembretes" id="prio-lembretes-baixa" value="baixa"><i></i>Baixa</label></div>
+      <label class="sr" for="date-lembretes">Data (opcional)</label>
+      <input class="field" type="date" id="date-lembretes">
+      <button class="btn" type="submit">Criar card</button>
+    </form>
+    <p class="tip">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
+    <p class="empty" id="empty-lembretes">Carregando…</p>
+    <div class="grid" id="list-lembretes"></div>
+    <details class="done" id="done-lembretes" hidden>
+      <summary><span>Resolvidos (<span id="done-count-lembretes">0</span>)</span></summary>
+      <div class="done-tools"><p>Arquivados saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="lembretes">Arquivar resolvidos</button></div>
+      <div class="grid" id="done-list-lembretes"></div>
+    </details>
+  </section>
+
+  <!-- Demandas do dia -->
+  <section class="sheet" id="panel-dia" data-tab="dia" role="tabpanel" aria-labelledby="tab-dia" hidden>
+    <div class="sheet-head">
+      <div>
+        <h2>Demandas do dia</h2>
+        <p>O que precisa ser feito hoje. O que ficar pendente continua aqui amanhã.</p>
+      </div>
+      <span class="progress" id="progress-dia"></span>
+    </div>
+    <div class="day-nav">
+      <button class="icon-btn" type="button" id="dia-prev" aria-label="Dia anterior"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg></button>
+      <button class="icon-btn" type="button" id="dia-next" aria-label="Próximo dia"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4.5L13 10l-5.5 5.5"/></svg></button>
+      <span class="day-nav-label" id="dia-label" aria-live="polite"></span>
+      <button class="link-btn" type="button" id="dia-hoje" hidden>Voltar para hoje</button>
+    </div>
+    <p class="view-note" id="dia-note" hidden></p>
+    <form class="add two" id="form-dia" autocomplete="off">
+      <label class="sr" for="in-dia">Título da nova demanda</label>
+      <input class="field grow" id="in-dia" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
+      <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-dia"><label data-p="alta"><input type="radio" name="prio-dia" id="prio-dia-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-dia" id="prio-dia-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-dia" id="prio-dia-baixa" value="baixa"><i></i>Baixa</label></div>
+      <button class="btn" type="submit">Criar card</button>
+    </form>
+    <p class="tip" id="tip-dia">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
+    <p class="empty" id="empty-dia">Carregando…</p>
+    <div class="grid" id="list-dia"></div>
+    <details class="done" id="done-dia" hidden>
+      <summary><span><span id="done-sum-dia">Feitas</span> (<span id="done-count-dia">0</span>)</span></summary>
+      <div class="done-tools" id="tools-dia"><p>Arquivadas saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="dia">Arquivar feitas</button></div>
+      <div class="grid" id="done-list-dia"></div>
+    </details>
+  </section>
+
+  <!-- Demandas de terceiros -->
+  <section class="sheet" id="panel-terceiros" data-tab="terceiros" role="tabpanel" aria-labelledby="tab-terceiros" hidden>
+    <div class="sheet-head">
+      <div>
+        <h2>Demandas de terceiros</h2>
+        <p>O que seus colegas pediram para você. Arraste um card até Lembretes ou Demandas do dia para encaixar na sua rotina.</p>
+      </div>
+    </div>
+    <p class="empty" id="empty-terceiros">Carregando…</p>
+    <div class="grid" id="list-terceiros"></div>
+    <details class="done" id="done-terceiros" hidden>
+      <summary><span>Concluídas (<span id="done-count-terceiros">0</span>)</span></summary>
+      <div class="done-tools"><p>Arquivadas saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="terceiros">Arquivar concluídas</button></div>
+      <div class="grid" id="done-list-terceiros"></div>
+    </details>
+
+    <h3 class="secao">Pedir para um colega</h3>
+    <form class="add enviar" id="form-enviar" autocomplete="off">
+      <label class="sr" for="para-enviar">Para quem</label>
+      <select class="field a-s" id="para-enviar" required><option value="">Para quem?</option></select>
+      <label class="sr" for="in-enviar">Título da demanda</label>
+      <input class="field a-t" id="in-enviar" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
+      <label class="sr" for="notes-enviar">Detalhes (opcional)</label>
+      <textarea class="field a-n" id="notes-enviar" rows="2" maxlength="20000" placeholder="Detalhes (opcional): valores, contatos, prazo…"></textarea>
+      <div class="prio-pick a-p" role="radiogroup" aria-label="Prioridade" id="prio-enviar"><label data-p="alta"><input type="radio" name="prio-enviar" id="prio-enviar-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-enviar" id="prio-enviar-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-enviar" id="prio-enviar-baixa" value="baixa"><i></i>Baixa</label></div>
+      <button class="btn a-b" type="submit">Enviar</button>
+    </form>
+    <p class="tip" id="tip-enviar">A pessoa vê o pedido na aba Demandas de terceiros dela, e você acompanha aqui quando for concluído.</p>
+
+    <h3 class="secao">Enviadas por mim</h3>
+    <p class="empty" id="empty-enviados">Carregando…</p>
+    <div class="grid" id="list-enviados"></div>
+    <details class="done" id="done-enviados" hidden>
+      <summary><span>Concluídas (<span id="done-count-enviados">0</span>)</span></summary>
+      <div class="grid" id="done-list-enviados"></div>
+    </details>
+  </section>
+
+  <!-- Calendário -->
+  <section class="sheet" id="panel-calendario" data-tab="calendario" role="tabpanel" aria-labelledby="tab-calendario" hidden>
+    <div class="sheet-head">
+      <div>
+        <h2>Calendário</h2>
+        <p>O que você concluiu em cada dia, e os prazos que vêm pela frente. Clique num dia para ver.</p>
+      </div>
+      <span class="progress" id="cal-summary"></span>
+    </div>
+    <div class="cal-wrap">
+      <div>
+        <div class="cal-nav">
+          <h3 id="cal-month"></h3>
+          <button class="icon-btn" type="button" id="cal-prev" aria-label="Mês anterior"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg></button>
+          <button class="icon-btn" type="button" id="cal-next" aria-label="Próximo mês"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4.5L13 10l-5.5 5.5"/></svg></button>
+          <button class="link-btn" type="button" id="cal-today">Hoje</button>
+        </div>
+        <div class="cal-grid" aria-hidden="true">
+          <span class="cal-wd">dom</span><span class="cal-wd">seg</span><span class="cal-wd">ter</span><span class="cal-wd">qua</span><span class="cal-wd">qui</span><span class="cal-wd">sex</span><span class="cal-wd">sáb</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-legend">
+          <span data-tab="lembretes"><i></i>Lembretes</span>
+          <span data-tab="dia"><i></i>Do dia</span>
+          <span data-tab="terceiros"><i></i>Terceiros</span>
+          <span><i class="due"></i>Prazo pendente</span>
+        </div>
+      </div>
+      <div class="day" aria-live="polite">
+        <h3 id="day-title"></h3>
+        <p class="day-sub" id="day-sub"></p>
+        <p style="margin:12px 0 0"><button class="move-btn" type="button" data-tab="dia" id="day-open-dia"><span class="tab-mark"></span><span>Ver este dia em Demandas do dia</span></button></p>
+        <div id="close-wrap">
+          <h4 id="close-title">Fechamento das demandas do dia</h4>
+          <div class="close-bar" aria-hidden="true"><span id="close-fill"></span></div>
+          <p class="close-sum" id="close-sum"></p>
+          <div id="close-done-wrap"><h5>Feitas</h5><div class="day-list" id="close-done"></div></div>
+          <div id="close-left-wrap"><h5 id="close-left-title">Ficaram pendentes</h5><div class="day-list" id="close-left"></div></div>
+        </div>
+        <div id="day-done-wrap"><h4>Outras concluídas neste dia</h4><div class="day-list" id="day-done"></div></div>
+        <div id="day-due-wrap"><h4>Com prazo neste dia</h4><div class="day-list" id="day-due"></div></div>
+        <p class="empty" id="day-empty"></p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Editor do card -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-scrim" data-close></div>
+  <div class="editor" role="dialog" aria-modal="true" aria-labelledby="ed-title" tabindex="-1" id="editor">
+    <div class="ed-bar">
+      <span class="ed-where"><span class="tab-mark"></span><span id="ed-where-text"></span></span>
+      <span class="ed-saved" id="ed-saved" role="status"></span>
+      <button class="icon-btn" type="button" id="ed-close" aria-label="Fechar"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+    </div>
+    <div class="ed-body">
+      <textarea class="ed-title" id="ed-title" rows="1" maxlength="280" placeholder="Título da demanda"></textarea>
+      <div class="ed-meta">
+        <span class="ed-check"><button class="check" type="button" id="ed-check" role="checkbox" aria-checked="false" aria-labelledby="ed-check-label"><svg viewBox="0 0 16 16" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></button><span id="ed-check-label">Pendente</span></span>
+        <div class="prio-pick small" role="radiogroup" aria-label="Prioridade" id="ed-prio"><label data-p="alta"><input type="radio" name="ed-prio" id="ed-prio-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="ed-prio" id="ed-prio-media" value="media"><i></i>Média</label><label data-p="baixa"><input type="radio" name="ed-prio" id="ed-prio-baixa" value="baixa"><i></i>Baixa</label></div>
+        <label class="ed-date" id="ed-date-wrap">Data <input class="field" type="date" id="ed-date"></label>
+        <span class="ed-author" id="ed-author"></span>
+      </div>
+      <label class="ed-notes-label" for="ed-notes">Anotações</label>
+      <textarea class="ed-notes" id="ed-notes" maxlength="20000"></textarea>
+      <p class="ed-hint" id="ed-hint"></p>
+    </div>
+    <div class="ed-foot">
+      <div class="ed-move" id="ed-move"></div>
+      <button class="link-btn danger-btn" type="button" id="ed-delete">Excluir card</button>
+    </div>
+  </div>
+</div>
+
+<div class="drop-hint" id="drop-hint" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toast-msg"></span><button type="button" id="toast-btn" hidden></button></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
