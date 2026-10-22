@@ -55,8 +55,13 @@ function setToday(){ $("#today").textContent = cap(new Date().toLocaleDateString
 const isDay = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /* ---------- Supabase ---------- */
-const configured = CFG.supabaseUrl && !/SEU-PROJETO/.test(CFG.supabaseUrl) && CFG.supabaseAnonKey && !/COLE-AQUI/.test(CFG.supabaseAnonKey);
-const sb = configured && window.supabase ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
+// Tolera valores colados com o nome da variável na frente (ex.: "NEXT_PUBLIC_SUPABASE_URL=https://…").
+const limpa = (v) => String(v || "").trim().replace(/^[A-Z0-9_]+=/, "").replace(/^["']|["']$/g, "").trim();
+CFG.supabaseUrl = limpa(CFG.supabaseUrl); CFG.supabaseAnonKey = limpa(CFG.supabaseAnonKey);
+const configured = /^https:\/\/.+/.test(CFG.supabaseUrl) && !/SEU-PROJETO/.test(CFG.supabaseUrl) && CFG.supabaseAnonKey && !/COLE-AQUI/.test(CFG.supabaseAnonKey);
+let sb = null;
+try { sb = configured && window.supabase ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null; }
+catch (e){ console.error(e); sb = null; }
 
 async function q(promise){ const { data, error } = await promise; if (error) throw error; return data; }
 
@@ -352,7 +357,11 @@ function renderDia(){
     pend = todayPend;
     done = data.filter(i => i.feito && !i.arquivado).sort(byDoneDesc);
     const ag = data.filter(i => !i.feito && i.quando && i.quando > T).length;
-    if (ag) noteText = `${ag} ${ag === 1 ? "card agendado" : "cards agendados"} para os próximos dias. Use a seta para a direita para ver.`;
+    const vieram = pend.filter(i => (i.criadoEm && dayOf(i.criadoEm) < T) || (i.quando && i.quando < T)).length;
+    const notas = [];
+    if (vieram) notas.push(`${vieram} ${vieram === 1 ? "demanda veio" : "demandas vieram"} de dias anteriores sem ser concluída${vieram === 1 ? "" : "s"}.`);
+    if (ag) notas.push(`${ag} ${ag === 1 ? "card agendado" : "cards agendados"} para os próximos dias.`);
+    noteText = notas.join(" ");
     empty = pend.length ? "" : done.length ? "Tudo feito por hoje." : "Nada para hoje ainda. Escreva um título acima para criar o primeiro card.";
     const fh = data.filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
     $("#progress-dia").textContent = (pend.length + fh) ? `${fh} de ${pend.length + fh} feitas hoje` : "";
@@ -365,10 +374,13 @@ function renderDia(){
     empty = pend.length ? "" : done.length ? "Nada ficou pendente neste dia." : "Nenhuma demanda registrada neste dia.";
     $("#progress-dia").textContent = (pend.length + done.length) ? `${done.length} de ${pend.length + done.length} feitas` : "";
   } else {
-    pend = data.filter(i => !i.feito && i.quando === D).sort(sortP);
+    // Dia futuro: o que está pendente hoje passa para este dia se não for concluído, mais o que foi agendado para ele.
+    pend = data.filter(i => !i.feito && (!i.quando || i.quando <= D)).sort(sortP);
     done = [];
-    noteText = "Cards agendados para este dia. Eles entram nas Demandas do dia quando a data chegar.";
-    empty = pend.length ? "" : "Nada agendado. Crie um card acima para deixar marcado neste dia.";
+    const agendadas = pend.filter(i => i.quando === D).length, passam = pend.length - agendadas;
+    noteText = `Previsão para este dia: ${passam} ${passam === 1 ? "demanda pendente passa" : "demandas pendentes passam"} para cá se não forem concluídas antes` +
+      (agendadas ? `, mais ${agendadas} ${agendadas === 1 ? "agendada" : "agendadas"} para esta data.` : ".");
+    empty = pend.length ? "" : "Nada previsto. Crie um card acima para agendar para este dia.";
     $("#progress-dia").textContent = "";
   }
   fillPanel("dia", pend.map(cardEl), done.map(cardEl), empty);
