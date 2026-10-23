@@ -355,14 +355,15 @@ function renderDia(){
   let pend, done, empty, noteText = "";
   if (D === T){
     pend = todayPend;
-    done = data.filter(i => i.feito && !i.arquivado).sort(byDoneDesc);
+    // Feitas ficam no dia em que foram concluídas: hoje mostra só as concluídas hoje.
+    done = data.filter(i => i.feito && !i.arquivado && i.feitoEm && dayOf(i.feitoEm) === T).sort(byDoneDesc);
     const ag = data.filter(i => !i.feito && i.quando && i.quando > T).length;
     const vieram = pend.filter(i => (i.criadoEm && dayOf(i.criadoEm) < T) || (i.quando && i.quando < T)).length;
     const notas = [];
     if (vieram) notas.push(`${vieram} ${vieram === 1 ? "demanda veio" : "demandas vieram"} de dias anteriores sem ser concluída${vieram === 1 ? "" : "s"}.`);
     if (ag) notas.push(`${ag} ${ag === 1 ? "card agendado" : "cards agendados"} para os próximos dias.`);
     noteText = notas.join(" ");
-    empty = pend.length ? "" : done.length ? "Tudo feito por hoje." : "Nada para hoje ainda. Escreva um título acima para criar o primeiro card.";
+    empty = pend.length ? "" : done.length ? "Tudo feito por hoje." : "Nada para hoje ainda. Escreva um título acima para criar o primeiro card. As feitas de dias anteriores ficam no dia em que foram concluídas (use a seta ←).";
     const fh = data.filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
     $("#progress-dia").textContent = (pend.length + fh) ? `${fh} de ${pend.length + fh} feitas hoje` : "";
   } else if (D < T){
