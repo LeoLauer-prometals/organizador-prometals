@@ -470,3 +470,29 @@ select.field{appearance:auto;padding-right:8px}
   .tabs{scroll-padding-inline:16px}
 }
 @media (max-width:600px){ .tab{padding-inline:7px;gap:4px} }
+
+/* ── Anotações formatadas ── */
+.fmt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin:6px 0 8px;padding:4px;border:1px solid var(--border);border-radius:10px;background:var(--input-bg)}
+.fmt-bar button{display:inline-grid;place-items:center;min-width:34px;height:32px;padding:0 7px;border:0;border-radius:7px;background:transparent;color:var(--text-muted);font:700 15px/1 var(--f-body);cursor:pointer}
+.fmt-bar button:hover{background:var(--hover-bg);color:var(--text)}
+.fmt-bar button[aria-pressed="true"]{background:#1e3a5f;color:var(--accent)}
+.fmt-bar svg{width:18px;height:18px}
+.fmt-h{font-weight:800}
+.fmt-h small{font-size:9px;margin-left:1px}
+.fmt-sep{width:1px;height:20px;margin:0 4px;background:var(--border)}
+.ed-notes{position:relative;overflow-wrap:anywhere;cursor:text;outline:none;padding-bottom:2px}
+.ed-notes:focus-visible{outline:none}
+.ed-notes.is-empty::before{content:attr(data-placeholder);position:absolute;left:2px;top:0;color:var(--text-muted);opacity:.75;pointer-events:none}
+.ed-notes div,.ed-notes p{margin:0}
+.ed-notes h3{margin:0;font:700 18px/28px var(--f-display);color:var(--accent)}
+.ed-notes ul,.ed-notes ol{margin:0;padding-left:26px}
+.ed-notes li{line-height:28px}
+.ed-notes ul.tarefas{list-style:none;padding-left:30px}
+.ed-notes ul.tarefas > li{position:relative}
+.ed-notes ul.tarefas > li::before{content:"";position:absolute;left:-27px;top:5px;width:18px;height:18px;box-sizing:border-box;border:2px solid var(--accent);border-radius:5px;cursor:pointer}
+.ed-notes ul.tarefas > li[data-done="1"]::before{background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.ed-notes ul.tarefas > li[data-done="1"]{color:var(--text-muted);text-decoration:line-through}
+.ed-notes mark{background:rgba(240,122,31,.38);color:inherit;border-radius:3px;padding:0 2px}
+.ed-notes a{color:#60a5fa;text-decoration:underline}
+.ed-notes blockquote{margin:0;padding-left:12px;border-left:3px solid var(--accent);color:var(--text-muted)}
+.ed-notes code{font-family:var(--f-mono);font-size:14px;background:var(--input-bg);padding:1px 4px;border-radius:4px}

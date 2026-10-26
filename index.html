@@ -268,8 +268,24 @@
         <label class="ed-date" id="ed-date-wrap">Data <input class="field" type="date" id="ed-date"></label>
         <span class="ed-author" id="ed-author"></span>
       </div>
-      <label class="ed-notes-label" for="ed-notes">Anotações</label>
-      <textarea class="ed-notes" id="ed-notes" maxlength="20000"></textarea>
+      <span class="ed-notes-label" id="ed-notes-label">Anotações</span>
+      <div class="fmt-bar" role="toolbar" aria-label="Formatação do texto" id="fmt-bar">
+        <button type="button" data-cmd="bold" title="Negrito (Ctrl+B)" aria-label="Negrito" aria-pressed="false"><b>N</b></button>
+        <button type="button" data-cmd="italic" title="Itálico (Ctrl+I)" aria-label="Itálico" aria-pressed="false"><i style="font-family:Georgia,serif">I</i></button>
+        <button type="button" data-cmd="underline" title="Sublinhado (Ctrl+U)" aria-label="Sublinhado" aria-pressed="false"><u>S</u></button>
+        <button type="button" data-cmd="strikeThrough" title="Tachado" aria-label="Tachado" aria-pressed="false"><s>T</s></button>
+        <button type="button" data-cmd="mark" title="Destacar" aria-label="Destacar" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16h12"/><path d="M6.5 12.5l6.8-6.8 2 2-6.8 6.8H6.5z"/></svg></button>
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button type="button" data-cmd="h3" title="Título" aria-label="Título" aria-pressed="false"><span class="fmt-h">T<small>1</small></span></button>
+        <button type="button" data-cmd="insertUnorderedList" title="Lista com marcadores" aria-label="Lista com marcadores" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h9M8 10h9M8 15h9"/><circle cx="4" cy="5" r=".9" fill="currentColor"/><circle cx="4" cy="10" r=".9" fill="currentColor"/><circle cx="4" cy="15" r=".9" fill="currentColor"/></svg></button>
+        <button type="button" data-cmd="insertOrderedList" title="Lista numerada" aria-label="Lista numerada" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h9M8 10h9M8 15h9"/><path d="M3 4l1.2-.7V7M3 9.6c.3-.5 1.9-.6 1.9.4 0 .7-1.9 1.4-1.9 2h2M3 14.2h1.8l-.9 1.1c.7 0 1.1.3 1.1.8 0 .9-1.5 1-2 .5" stroke-width="1.3"/></svg></button>
+        <button type="button" data-cmd="tarefas" title="Lista de tarefas" aria-label="Lista de tarefas" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="4.5" height="4.5" rx="1"/><path d="M3.5 5.3l.9.9 1.7-1.8"/><rect x="2.5" y="12" width="4.5" height="4.5" rx="1"/><path d="M10 5.3h7M10 14.3h7"/></svg></button>
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button type="button" data-cmd="link" title="Link (Ctrl+clique para abrir)" aria-label="Link" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 11.5a3 3 0 004.2 0l2.6-2.6a3 3 0 00-4.2-4.2l-.9.9"/><path d="M11.5 8.5a3 3 0 00-4.2 0l-2.6 2.6a3 3 0 004.2 4.2l.9-.9"/></svg></button>
+        <button type="button" data-cmd="removeFormat" title="Limpar formatação" aria-label="Limpar formatação"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10M10 4l-3 12M4 16l12-12" /></svg></button>
+      </div>
+      <div class="ed-notes" id="ed-notes" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="ed-notes-label" spellcheck="true"></div>
+      <p class="ed-files-hint">Atalhos: comece a linha com <b>-</b> e espaço para lista, <b>1.</b> para lista numerada, <b>[]</b> para tarefa. Tab recua um item da lista.</p>
       <p class="ed-hint" id="ed-hint"></p>
       <div class="ed-files">
         <div class="ed-files-head">

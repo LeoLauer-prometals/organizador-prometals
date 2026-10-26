@@ -290,8 +290,8 @@ function cardEl(i){
     g.addEventListener("click", () => { if (!S.suppressClick) openEditor(i.key); });
     top.append(g);
   }
-  const hasNotes = !!i.notas.trim();
-  art.append(open, top, el("p", "card-notes" + (hasNotes ? "" : " is-empty"), hasNotes ? i.notas : "Sem anotações. Clique para escrever."));
+  const pt = plainText(i.notas).trim(), hasNotes = !!pt;
+  art.append(open, top, el("p", "card-notes" + (hasNotes ? "" : " is-empty"), hasNotes ? pt : "Sem anotações. Clique para escrever."));
 
   const isP = isPedidoTab(i.tab);
   const chips = isP ? chipsPedido(i) : chipsSimple(i);
@@ -300,6 +300,8 @@ function cardEl(i){
   if (i.tab === "terceiros") foot.append(whoEl(i.de, "de"));
   if (i.tab === "enviados") foot.append(whoEl(i.para, "para"));
   chips.forEach(c => foot.append(chipEl(c)));
+  const tf = tarefasDe(i.notas);
+  if (tf) foot.append(chipEl({ text: `tarefas ${tf.feitas}/${tf.total}`, kind: tf.feitas === tf.total ? "from" : "" }));
   const na = (i.anexos || []).length;
   if (na) foot.append(chipEl({ text: `${na} ${na === 1 ? "anexo" : "anexos"}` }));
   if (foot.childNodes.length) art.append(foot);
@@ -509,7 +511,7 @@ function miniRow(i, side, withPrio){
   b.type = "button"; b.dataset.tab = i.tab;
   const mid = el("span");
   mid.append(el("span", "mini-title", i.texto || "Sem título"));
-  let sub = i.notas.trim() ? i.notas.trim().split("\n")[0] : NOMES[i.tab];
+  let sub = plainText(i.notas).trim() ? plainText(i.notas).trim().split("\n")[0] : NOMES[i.tab];
   if (withPrio) sub = `Prioridade ${PRIO_NOME[i.prioridade].toLowerCase()} · ${sub}`;
   mid.append(el("span", "mini-notes", sub));
   b.append(el("span", "mini-mark"), mid, el("span", "mini-time", side));
@@ -594,7 +596,7 @@ function rotItem(x, n){
   meta.append(prioEl(i.prioridade), src);
   x.motivos.forEach(m => meta.append(chipEl(m)));
   body.append(meta);
-  if (i.notas.trim()) body.append(el("span", "rot-notes", i.notas.trim().split("\n")[0]));
+  if (plainText(i.notas).trim()) body.append(el("span", "rot-notes", plainText(i.notas).trim().split("\n")[0]));
   body.addEventListener("click", () => openEditor(i.key));
   li.append(el("span", "rot-num", String(n)), checkBtn(i, true), body);
   return li;
@@ -746,9 +748,9 @@ function openEditor(key){
   S.ed = { key, item: i, dirty: false, timer: null, chain: null, last: null, ret: document.activeElement };
   ED.modal.dataset.tab = i.tab === "enviados" ? "terceiros" : i.tab;
   $("#ed-where-text").textContent = NOMES[i.tab];
-  ED.title.value = i.texto; ED.notes.value = i.notas;
+  ED.title.value = i.texto; ED.notes.innerHTML = toHtml(i.notas); notesEmptyState();
   ED.title.readOnly = !canEditTitle(i);
-  ED.notes.placeholder = "Anote aqui tudo sobre esta demanda: contatos, valores, prazos, próximos passos…";
+  ED.notes.dataset.placeholder = "Anote aqui tudo sobre esta demanda: contatos, valores, prazos, próximos passos…";
   const hint = $("#ed-hint");
   hint.hidden = !isPedidoTab(i.tab);
   hint.textContent = i.tab === "terceiros" ? `${nomeDe(i.de)} também vê estas anotações. Só quem pediu muda o título.`
@@ -762,7 +764,7 @@ function openEditor(key){
   ED.modal.hidden = false; html.classList.add("modal-open");
   autosize(ED.title);
   if (window.matchMedia("(hover: hover)").matches){
-    ED.notes.focus(); ED.notes.setSelectionRange(ED.notes.value.length, ED.notes.value.length);
+    ED.notes.focus(); caretAoFim(ED.notes);
   } else $("#editor").focus();
 }
 function refreshEditorMeta(){
@@ -797,7 +799,10 @@ function moveBtn(tab, run){
   return b;
 }
 function readPatch(item){
-  const patch = { notas: ED.notes.value.slice(0, 20000) };
+  const patch = {};
+  const notas = serializeNotes();
+  if (notas.length <= 20000) patch.notas = notas;
+  else toast("A anotação ficou longa demais para salvar. Divida em outro card ou use um anexo.");
   if (canEditTitle(item)){ const t = ED.title.value.replace(/\s+/g, " ").trim().slice(0, 280); if (t) patch.texto = t; }
   return patch;
 }
@@ -837,7 +842,178 @@ function syncEditor(){
 }
 ED.title.addEventListener("input", () => { autosize(ED.title); markDirty(); });
 ED.title.addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); ED.notes.focus(); } });
-ED.notes.addEventListener("input", markDirty);
+ED.notes.addEventListener("input", () => { notesEmptyState(); markDirty(); });
+
+/* ---------- texto formatado das anotações ---------- */
+const OK_TAGS = new Set(["B","STRONG","I","EM","U","S","STRIKE","DEL","UL","OL","LI","BR","P","DIV","H3","A","MARK","BLOCKQUOTE","CODE"]);
+const DROP_TAGS = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","TEMPLATE","SVG","MATH","IMG","VIDEO","AUDIO","CANVAS","LINK","META","TITLE","HEAD","NOSCRIPT","FORM","INPUT","BUTTON","SELECT","TEXTAREA"]);
+const looksHtml = (t) => /<\/?(b|strong|i|em|u|s|strike|del|ul|ol|li|br|p|div|h3|a|mark|blockquote|code)\b/i.test(t || "");
+function esc(t){ return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function sanitize(html){
+  const doc = new DOMParser().parseFromString("<div>" + (html || "") + "</div>", "text/html");
+  const root = doc.body.firstElementChild;
+  const walk = (node) => {
+    for (let ch of [...node.childNodes]){
+      if (ch.nodeType === 3) continue;
+      if (ch.nodeType !== 1 || DROP_TAGS.has(ch.tagName)){ ch.remove(); continue; }
+      if (/^H[1-6]$/.test(ch.tagName) && ch.tagName !== "H3"){ const h = doc.createElement("h3"); h.append(...ch.childNodes); ch.replaceWith(h); ch = h; }
+      walk(ch);
+      const tag = ch.tagName;
+      if (!OK_TAGS.has(tag)){ ch.replaceWith(...ch.childNodes); continue; }
+      const href = tag === "A" ? (ch.getAttribute("href") || "") : "";
+      const tarefas = tag === "UL" && ch.classList.contains("tarefas");
+      const done = tag === "LI" && ch.getAttribute("data-done") === "1";
+      for (const a of [...ch.attributes]) ch.removeAttribute(a.name);
+      if (tag === "A"){
+        if (/^(https?:|mailto:)/i.test(href)){ ch.setAttribute("href", href); ch.setAttribute("target", "_blank"); ch.setAttribute("rel", "noopener"); }
+        else { ch.replaceWith(...ch.childNodes); continue; }
+      }
+      if (tarefas) ch.setAttribute("class", "tarefas");
+      if (done) ch.setAttribute("data-done", "1");
+    }
+  };
+  walk(root);
+  return root.innerHTML;
+}
+function toHtml(notas){ return looksHtml(notas) ? sanitize(notas) : esc(notas || "").replace(/\n/g, "<br>"); }
+const plainCache = new Map();
+function plainText(notas){
+  if (!notas || !looksHtml(notas)) return notas || "";
+  if (plainCache.has(notas)) return plainCache.get(notas);
+  const doc = new DOMParser().parseFromString("<div>" + sanitize(notas) + "</div>", "text/html");
+  const out = [];
+  const walk = (node, ctx) => {
+    for (const ch of node.childNodes){
+      if (ch.nodeType === 3){ out.push(ch.textContent); continue; }
+      if (ch.nodeType !== 1) continue;
+      const t = ch.tagName;
+      if (t === "BR"){ out.push("\n"); continue; }
+      if (t === "UL" || t === "OL"){ let n = 0; for (const li of ch.children){ if (li.tagName !== "LI") continue; n++;
+          const pre = ch.classList.contains("tarefas") ? (li.getAttribute("data-done") === "1" ? "☑ " : "☐ ") : t === "OL" ? n + ". " : "• ";
+          out.push("\n" + pre); walk(li); } out.push("\n"); continue; }
+      const block = ["DIV","P","H3","BLOCKQUOTE","LI"].includes(t);
+      if (block) out.push("\n");
+      walk(ch);
+      if (block) out.push("\n");
+    }
+  };
+  walk(doc.body.firstElementChild);
+  const txt = out.join("").replace(/\n{2,}/g, "\n").trim();
+  if (plainCache.size > 500) plainCache.clear();
+  plainCache.set(notas, txt);
+  return txt;
+}
+function tarefasDe(notas){
+  if (!notas || notas.indexOf("tarefas") < 0) return null;
+  const doc = new DOMParser().parseFromString("<div>" + sanitize(notas) + "</div>", "text/html");
+  const lis = doc.querySelectorAll("ul.tarefas > li");
+  if (!lis.length) return null;
+  return { total: lis.length, feitas: [...lis].filter(li => li.getAttribute("data-done") === "1").length };
+}
+function serializeNotes(){
+  const html = sanitize(ED.notes.innerHTML).replace(/^(<br>|<div><br><\/div>|\s)+|(<br>|<div><br><\/div>|\s)+$/g, "");
+  if (!ED.notes.textContent.trim() && !ED.notes.querySelector("li")) return "";
+  return html;
+}
+function notesEmptyState(){ ED.notes.classList.toggle("is-empty", !ED.notes.textContent.trim() && !ED.notes.querySelector("li,h3")); }
+function caretAoFim(node){
+  try { const r = document.createRange(); r.selectNodeContents(node); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch {}
+}
+try { document.execCommand("styleWithCSS", false, false); document.execCommand("defaultParagraphSeparator", false, "div"); } catch {}
+function selNode(){ const s = getSelection(); if (!s.rangeCount) return null; const n = s.anchorNode; return n && (n.nodeType === 1 ? n : n.parentElement); }
+function dentro(sel){ const n = selNode(); if (!n || !ED.notes.contains(n)) return null; const x = n.closest(sel); return x && ED.notes.contains(x) ? x : null; }
+function unwrap(elm){ elm.replaceWith(...elm.childNodes); }
+function aplicar(cmd){
+  ED.notes.focus();
+  if (cmd === "h3"){ document.execCommand("formatBlock", false, dentro("h3") ? "<div>" : "<h3>"); }
+  else if (cmd === "mark"){
+    const m = dentro("mark");
+    if (m) unwrap(m);
+    else { const t = getSelection().toString(); if (t) document.execCommand("insertHTML", false, "<mark>" + esc(t).replace(/\n/g, "<br>") + "</mark>"); }
+  }
+  else if (cmd === "link"){
+    const a = dentro("a");
+    if (a){ unwrap(a); }
+    else {
+      const sel = getSelection(), texto = sel.toString(), range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      let url = window.prompt("Endereço do link (ex.: www.site.com.br):", "");
+      if (!url) return;
+      url = url.trim(); if (!/^(https?:|mailto:)/i.test(url)) url = "https://" + url;
+      ED.notes.focus(); if (range){ sel.removeAllRanges(); sel.addRange(range); }
+      if (texto) document.execCommand("createLink", false, url);
+      else document.execCommand("insertHTML", false, `<a href="${esc(url)}">${esc(url)}</a>&nbsp;`);
+    }
+  }
+  else if (cmd === "tarefas"){
+    const ul = dentro("ul");
+    if (ul && ul.classList.contains("tarefas")) document.execCommand("insertUnorderedList");
+    else if (ul) ul.classList.add("tarefas");
+    else { if (dentro("ol")) document.execCommand("insertOrderedList"); document.execCommand("insertUnorderedList"); const nu = dentro("ul"); if (nu) nu.classList.add("tarefas"); }
+  }
+  else if (cmd === "insertUnorderedList"){
+    const ul = dentro("ul");
+    if (ul && ul.classList.contains("tarefas")) ul.classList.remove("tarefas");
+    else document.execCommand(cmd);
+  }
+  else if (cmd === "removeFormat"){
+    document.execCommand("removeFormat");
+    const m = dentro("mark"); if (m) unwrap(m);
+    if (dentro("h3")) document.execCommand("formatBlock", false, "<div>");
+  }
+  else document.execCommand(cmd);
+  notesEmptyState(); markDirty(); atualizarBarra();
+}
+function atualizarBarra(){
+  const tar = !!(dentro("ul") && dentro("ul").classList.contains("tarefas"));
+  const estado = {
+    bold: !!dentro("b,strong"), italic: !!dentro("i,em"), underline: !!dentro("u"), strikeThrough: !!dentro("s,strike,del"),
+    mark: !!dentro("mark"), h3: !!dentro("h3"), link: !!dentro("a"),
+    insertOrderedList: !!dentro("ol"), insertUnorderedList: !!dentro("ul") && !tar, tarefas: tar
+  };
+  document.querySelectorAll("#fmt-bar [data-cmd]").forEach(b => { if (b.dataset.cmd in estado) b.setAttribute("aria-pressed", String(!!estado[b.dataset.cmd])); });
+}
+document.querySelectorAll("#fmt-bar [data-cmd]").forEach(b => {
+  b.addEventListener("mousedown", (e) => e.preventDefault());
+  b.addEventListener("click", () => aplicar(b.dataset.cmd));
+});
+document.addEventListener("selectionchange", () => { if (S.ed) atualizarBarra(); });
+ED.notes.addEventListener("click", (e) => {
+  const li = e.target.closest && e.target.closest("ul.tarefas > li");
+  if (li && ED.notes.contains(li) && e.clientX < li.getBoundingClientRect().left + 2){
+    e.preventDefault();
+    if (li.getAttribute("data-done") === "1") li.removeAttribute("data-done"); else li.setAttribute("data-done", "1");
+    markDirty(); return;
+  }
+  const a = e.target.closest && e.target.closest("a");
+  if (a && (e.ctrlKey || e.metaKey)){ e.preventDefault(); window.open(a.href, "_blank", "noopener"); }
+});
+ED.notes.addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && dentro("li")){ e.preventDefault(); document.execCommand(e.shiftKey ? "outdent" : "indent"); markDirty(); return; }
+  if (e.key === "Enter" && !e.shiftKey){
+    setTimeout(() => { const li = dentro("li"); if (li && !li.textContent.trim()) li.removeAttribute("data-done"); }, 0);
+  }
+  if (e.key === " " && !dentro("li")){
+    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
+    const r = sel.getRangeAt(0);
+    const block = (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement).closest("div,p,h3") ;
+    const base = block && ED.notes.contains(block) && block !== ED.notes ? block : ED.notes;
+    const pre = document.createRange(); pre.setStart(base, 0); pre.setEnd(r.startContainer, r.startOffset);
+    const t = pre.toString();
+    const cmd = (t === "-" || t === "*") ? "insertUnorderedList" : /^1[.)]$/.test(t) ? "insertOrderedList" : (t === "[]" || t === "[ ]") ? "tarefas" : null;
+    if (!cmd) return;
+    e.preventDefault();
+    sel.removeAllRanges(); sel.addRange(pre); document.execCommand("delete");
+    aplicar(cmd);
+  }
+});
+ED.notes.addEventListener("paste", (e) => {
+  const cd = e.clipboardData; if (!cd) return;
+  if (cd.files && cd.files.length) return;
+  e.preventDefault();
+  const html = cd.getData("text/html");
+  const limpo = html ? sanitize(html.replace(/<!--[\s\S]*?-->/g, "")) : esc(cd.getData("text/plain")).replace(/\r?\n/g, "<br>");
+  document.execCommand("insertHTML", false, limpo);
+});
 ED.date.addEventListener("change", () => {
   const ed = S.ed; if (!ed) return;
   write(() => patchItem(ed.item, { quando: isDay(ED.date.value) ? ED.date.value : null }));
@@ -956,7 +1132,7 @@ document.addEventListener("keydown", (e) => {
     if (S.ed){ e.preventDefault(); closeEditor(); return; }
   }
   if (e.key === "Tab" && S.ed){
-    const f = [...$("#editor").querySelectorAll("button:not([disabled]),textarea,input:not([disabled])")].filter(n => n.offsetParent !== null);
+    const f = [...$("#editor").querySelectorAll("button:not([disabled]),textarea,input:not([disabled]),[contenteditable=true]")].filter(n => n.offsetParent !== null);
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && (document.activeElement === first || document.activeElement === $("#editor"))){ e.preventDefault(); last.focus(); }
