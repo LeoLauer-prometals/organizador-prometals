@@ -75,6 +75,10 @@
   <p class="banner" id="banner" hidden></p>
 
   <nav class="tabs" role="tablist" aria-label="Abas do organizador">
+    <button class="tab" role="tab" id="tab-rotina" data-tab="rotina" aria-controls="panel-rotina" aria-selected="false" tabindex="-1">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h9M8 10h9M8 15h9"/><path d="M3 5l1 1 2-2M3 10l1 1 2-2M3 15l1 1 2-2"/></svg>
+      <span class="full">Rotina</span><span class="short">Rotina</span><span class="count" id="count-rotina">–</span><span class="tab-alert" aria-hidden="true"></span>
+    </button>
     <button class="tab" role="tab" id="tab-lembretes" data-tab="lembretes" aria-controls="panel-lembretes" aria-selected="false" tabindex="-1">
       <span class="tab-mark"></span><span class="full">Lembretes</span><span class="short">Lembretes</span><span class="count" id="count-lembretes">–</span><span class="tab-alert" aria-hidden="true"></span>
     </button>
@@ -89,6 +93,20 @@
       <span class="full">Calendário</span><span class="short">Calendário</span>
     </button>
   </nav>
+
+  <!-- Rotina -->
+  <section class="sheet" id="panel-rotina" data-tab="rotina" role="tabpanel" aria-labelledby="tab-rotina" hidden>
+    <div class="sheet-head">
+      <div>
+        <h2>Rotina</h2>
+        <p>A ordem sugerida para hoje, montada sozinha com o que ficou pendente, os lembretes que vencem e os pedidos dos colegas.</p>
+      </div>
+      <span class="progress" id="rot-summary"></span>
+    </div>
+    <p class="tip">A ordem leva em conta a prioridade, os prazos (atrasados e que vencem hoje) e há quanto tempo cada demanda está esperando. Marque como feito aqui mesmo e a lista se reorganiza.</p>
+    <p class="empty" id="empty-rotina">Carregando…</p>
+    <div id="rot-groups"></div>
+  </section>
 
   <!-- Lembretes -->
   <section class="sheet" id="panel-lembretes" data-tab="lembretes" role="tabpanel" aria-labelledby="tab-lembretes" hidden>
@@ -106,7 +124,7 @@
       <input class="field" type="date" id="date-lembretes">
       <button class="btn" type="submit">Criar card</button>
     </form>
-    <p class="tip">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
+    <p class="tip">Lembretes com data entram sozinhos nas Demandas do dia quando a data chega. Clique num card para anotar os detalhes.</p>
     <p class="empty" id="empty-lembretes">Carregando…</p>
     <div class="grid" id="list-lembretes"></div>
     <details class="done" id="done-lembretes" hidden>
@@ -253,6 +271,15 @@
       <label class="ed-notes-label" for="ed-notes">Anotações</label>
       <textarea class="ed-notes" id="ed-notes" maxlength="20000"></textarea>
       <p class="ed-hint" id="ed-hint"></p>
+      <div class="ed-files">
+        <div class="ed-files-head">
+          <span class="ed-notes-label">Anexos <span id="ed-anexos-count"></span></span>
+          <label class="move-btn" for="ed-file"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 9.5l-5.8 5.8a3.5 3.5 0 01-5-5l6.5-6.5a2.3 2.3 0 013.3 3.3l-6.4 6.4a1.2 1.2 0 01-1.7-1.7l5.7-5.7"/></svg>Anexar arquivo ou imagem</label>
+          <input type="file" id="ed-file" multiple hidden>
+        </div>
+        <div class="anexos" id="ed-anexos"></div>
+        <p class="ed-files-hint">Também dá para colar uma imagem (Ctrl+V) ou arrastar arquivos para cá. Até 10 MB por arquivo.</p>
+      </div>
     </div>
     <div class="ed-foot">
       <div class="ed-move" id="ed-move"></div>

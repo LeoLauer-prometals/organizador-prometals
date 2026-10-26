@@ -414,3 +414,59 @@ select.field{appearance:auto;padding-right:8px}
 .setup{max-width:640px;margin:10vh auto;padding:24px;background:var(--bg2);border-radius:14px;border-bottom:3px solid var(--accent);line-height:1.6}
 .setup h1{color:var(--accent);font-size:20px;margin:0 0 8px}
 .setup code{background:var(--input-bg);padding:2px 6px;border-radius:6px}
+
+/* ── Rotina ── */
+[data-tab="rotina"]{--tab:var(--accent)}
+.rot-group + .rot-group{margin-top:24px}
+.rot-title{margin:0 0 10px;color:var(--accent);font:700 12px/1 var(--f-display);letter-spacing:1px;text-transform:uppercase}
+.rot-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rot-item{display:grid;grid-template-columns:26px auto minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.rot-item:hover{background:var(--hover-bg)}
+.rot-item.is-alta{border-color:var(--p-alta);background:color-mix(in srgb,var(--p-alta) 12%,var(--card))}
+.rot-num{font:800 18px/22px var(--f-display);color:var(--accent);text-align:right;font-variant-numeric:tabular-nums}
+.rot-body{display:grid;gap:6px;min-width:0;padding:0;border:0;background:none;color:var(--text);text-align:left;cursor:pointer;font:inherit}
+.rot-text{font:700 15px/1.3 var(--f-display);overflow-wrap:anywhere}
+.rot-body:hover .rot-text{color:var(--accent)}
+.rot-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rot-src{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)}
+.rot-notes{font-size:13px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot-item .check{margin-top:0}
+
+/* ── Anexos ── */
+.ed-notes{min-height:220px}
+.ed-files{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.ed-files-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ed-files-head .ed-notes-label{margin:0}
+.ed-files-head .move-btn{cursor:pointer}
+.anexos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.anexo{position:relative;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--input-bg);overflow:hidden}
+.anexo-link{display:flex;align-items:center;gap:8px;min-height:56px;padding:10px 36px 10px 10px;color:var(--text);text-decoration:none}
+.anexo-link:hover{background:var(--hover-bg)}
+.anexo.is-img .anexo-link{display:block;padding:0;min-height:0}
+.anexo.is-img img{display:block;width:100%;height:110px;object-fit:cover;background:var(--bg)}
+.anexo-cap{display:block;padding:6px 8px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.anexo-ico{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:8px;background:#1e3a5f;color:#60a5fa;font:700 10px/1 var(--f-body)}
+.anexo.is-img .anexo-ico{width:100%;height:110px;border-radius:0}
+.anexo-nome{flex:1;min-width:0;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anexo-size{flex:none;font-size:11px;color:var(--text-muted)}
+.anexo-del{position:absolute;top:6px;right:6px;width:26px;height:26px;display:grid;place-items:center;padding:0;border:0;border-radius:6px;background:rgba(15,23,32,.8);color:#fff;cursor:pointer}
+.anexo-del:hover{background:#7f1d1d}
+.anexo-del svg{width:12px;height:12px}
+.ed-files-hint{margin:8px 0 0;font-size:12px;color:var(--text-muted)}
+.editor.is-drop{outline:3px dashed var(--accent);outline-offset:-6px}
+.anexo:not(.is-img) .anexo-link{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;row-gap:2px;align-items:center}
+.anexo:not(.is-img) .anexo-ico{grid-row:1 / span 2}
+.anexo:not(.is-img) .anexo-size{grid-column:2}
+@media (max-width:600px){
+  .tab .count{display:none}
+  .tab[data-tab="rotina"] svg{display:none}
+  .tab{padding-inline:9px}
+  .rot-item{grid-template-columns:auto auto minmax(0,1fr);gap:10px;padding:12px}
+  .rot-num{text-align:left;min-width:14px}
+}
+@media (max-width:600px){
+  .tab{flex:none;min-width:auto}
+  .tab .short{overflow:visible}
+  .tabs{scroll-padding-inline:16px}
+}
+@media (max-width:600px){ .tab{padding-inline:7px;gap:4px} }

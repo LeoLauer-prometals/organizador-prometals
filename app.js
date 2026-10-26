@@ -7,8 +7,8 @@
 
 /* ---------- constantes ---------- */
 const CARD_TABS = ["lembretes", "dia", "terceiros"];
-const TABS = ["lembretes", "dia", "terceiros", "calendario"];
-const NOMES = { lembretes: "Lembretes", dia: "Demandas do dia", terceiros: "Demandas de terceiros", enviados: "Enviadas por mim", calendario: "Calendário" };
+const TABS = ["rotina", "lembretes", "dia", "terceiros", "calendario"];
+const NOMES = { rotina: "Rotina", lembretes: "Lembretes", dia: "Demandas do dia", terceiros: "Demandas de terceiros", enviados: "Enviadas por mim", calendario: "Calendário" };
 const PRIOS = ["alta", "media", "baixa"];
 const PRIO_RANK = { alta: 0, media: 1, baixa: 2 };
 const PRIO_NOME = { alta: "Alta", media: "Média", baixa: "Baixa" };
@@ -74,12 +74,13 @@ const isPedidoTab = (tab) => tab === "terceiros" || tab === "enviados";
 function rowToCard(r){
   return { tab: r.aba, id: r.id, key: `${r.aba}|${r.id}`, texto: r.texto || "", notas: r.notas || "",
     quando: r.quando || null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
-    criadoEm: r.criado_em || null, arquivado: !!r.arquivado, pedido: r.pedido || null };
+    criadoEm: r.criado_em || null, arquivado: !!r.arquivado, pedido: r.pedido || null,
+    anexos: Array.isArray(r.anexos) ? r.anexos : [] };
 }
 function rowToPedido(r, tab){
   return { tab, id: r.id, key: `${tab}|${r.id}`, de: r.de, para: r.para, texto: r.texto || "", notas: r.notas || "",
     quando: null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
-    criadoEm: r.criado_em || null, arquivado: !!r.arquivado_para };
+    criadoEm: r.criado_em || null, arquivado: !!r.arquivado_para, anexos: Array.isArray(r.anexos) ? r.anexos : [] };
 }
 const COLS = { texto: "texto", notas: "notas", quando: "quando", prioridade: "prioridade", feito: "feito",
   feitoEm: "feito_em", arquivado: "arquivado", aba: "aba", pedido: "pedido", removido: "removido_para" };
@@ -93,7 +94,7 @@ function toRow(patch, pedido){
 }
 function cardRow(i){
   return { id: i.id, aba: i.tab, texto: i.texto, notas: i.notas || "", quando: i.quando, prioridade: i.prioridade,
-    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm };
+    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm, anexos: i.anexos || [] };
 }
 
 async function loadPerfis(){
@@ -115,9 +116,19 @@ async function loadPedidos(){
   const unknown = rows.some(r => !S.perfis[r.de] || !S.perfis[r.para]);
   if (unknown) await loadPerfis();
 }
+// Lembretes com data entram sozinhos nas Demandas do dia quando a data chega.
+const tentouMover = new Set();
+async function autoMoveLembretes(){
+  const ids = (S.data.lembretes || []).filter(i => !i.feito && i.quando && i.quando <= S.today && !tentouMover.has(i.id)).map(i => i.id);
+  if (!ids.length) return;
+  ids.forEach(id => tentouMover.add(id));
+  try { await q(sb.from("cards").update({ aba: "dia" }).in("id", ids)); await loadCards(); }
+  catch (e){ console.warn(e); }
+}
 async function reloadAll(){
   try {
     await Promise.all([loadCards(), loadPedidos()]);
+    await autoMoveLembretes();
     renderAll(); syncEditor();
     $("#banner").hidden = true;
   } catch (e){
@@ -132,6 +143,8 @@ function errMsg(e){
   const m = (e && (e.message || "")) + "";
   if (/row-level security|permission|42501/i.test(m + (e && e.code))) return "Você não tem permissão para fazer isso.";
   if (/Só quem|Não é permitido|Use seu e-mail/.test(m)) return m;
+  if (/Bucket not found|anexos/i.test(m)) return "Os anexos ainda não foram ativados no Supabase. Rode o arquivo atualizacao-1-anexos.sql (veja o README).";
+  if (/exceeded the maximum allowed size|Payload too large|413/i.test(m)) return "Arquivo grande demais. O limite é 10 MB.";
   if (/fetch|network|Failed/i.test(m)) return "Sem conexão. Verifique a internet e tente de novo.";
   return "Não foi possível salvar. Tente de novo.";
 }
@@ -226,7 +239,7 @@ function chipsSimple(i){
   const c = [];
   if (i.pedido) c.push({ text: "de terceiros", kind: "from" });
   if (i.quando) c.push(dueChip(i.quando, i.feito));
-  if (i.tab === "dia" && !i.feito && i.criadoEm){
+  if (i.tab === "dia" && !i.feito && i.criadoEm && !i.quando){
     const iso = dayOf(i.criadoEm), diff = daysBetween(iso, S.today);
     if (diff === 1) c.push({ text: "desde ontem", kind: "soon" });
     else if (diff > 1) c.push({ text: `desde ${fmtShort(iso)}`, kind: "late" });
@@ -241,7 +254,7 @@ function chipsPedido(i){
   if (i.feito && i.feitoEm) c.push({ text: (i.tab === "enviados" ? "concluída " : "feito ") + when(i.feitoEm) });
   return c;
 }
-function canToggle(i){ return i.tab !== "enviados" && !(i.tab === "dia" && S.diaDate < S.today); }
+function canToggle(i){ return i.tab !== "enviados" && !(i.tab === "dia" && S.active === "dia" && S.diaDate < S.today); }
 function canEditTitle(i){ return i.tab !== "terceiros"; }
 function checkBtn(i, enabled){
   const box = el("button", "check");
@@ -287,6 +300,8 @@ function cardEl(i){
   if (i.tab === "terceiros") foot.append(whoEl(i.de, "de"));
   if (i.tab === "enviados") foot.append(whoEl(i.para, "para"));
   chips.forEach(c => foot.append(chipEl(c)));
+  const na = (i.anexos || []).length;
+  if (na) foot.append(chipEl({ text: `${na} ${na === 1 ? "anexo" : "anexos"}` }));
   if (foot.childNodes.length) art.append(foot);
   if (draggable) art.addEventListener("pointerdown", (e) => onPointerDown(e, art, i));
   return art;
@@ -357,12 +372,7 @@ function renderDia(){
     pend = todayPend;
     // Feitas ficam no dia em que foram concluídas: hoje mostra só as concluídas hoje.
     done = data.filter(i => i.feito && !i.arquivado && i.feitoEm && dayOf(i.feitoEm) === T).sort(byDoneDesc);
-    const ag = data.filter(i => !i.feito && i.quando && i.quando > T).length;
-    const vieram = pend.filter(i => (i.criadoEm && dayOf(i.criadoEm) < T) || (i.quando && i.quando < T)).length;
-    const notas = [];
-    if (vieram) notas.push(`${vieram} ${vieram === 1 ? "demanda veio" : "demandas vieram"} de dias anteriores sem ser concluída${vieram === 1 ? "" : "s"}.`);
-    if (ag) notas.push(`${ag} ${ag === 1 ? "card agendado" : "cards agendados"} para os próximos dias.`);
-    noteText = notas.join(" ");
+    noteText = "";
     empty = pend.length ? "" : done.length ? "Tudo feito por hoje." : "Nada para hoje ainda. Escreva um título acima para criar o primeiro card. As feitas de dias anteriores ficam no dia em que foram concluídas (use a seta ←).";
     const fh = data.filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
     $("#progress-dia").textContent = (pend.length + fh) ? `${fh} de ${pend.length + fh} feitas hoje` : "";
@@ -376,7 +386,8 @@ function renderDia(){
     $("#progress-dia").textContent = (pend.length + done.length) ? `${done.length} de ${pend.length + done.length} feitas` : "";
   } else {
     // Dia futuro: o que está pendente hoje passa para este dia se não for concluído, mais o que foi agendado para ele.
-    pend = data.filter(i => !i.feito && (!i.quando || i.quando <= D)).sort(sortP);
+    pend = data.filter(i => !i.feito && (!i.quando || i.quando <= D))
+      .concat((S.data.lembretes || []).filter(i => !i.feito && i.quando && i.quando > T && i.quando <= D)).sort(sortP);
     done = [];
     const agendadas = pend.filter(i => i.quando === D).length, passam = pend.length - agendadas;
     noteText = `Previsão para este dia: ${passam} ${passam === 1 ? "demanda pendente passa" : "demandas pendentes passam"} para cá se não forem concluídas antes` +
@@ -517,11 +528,84 @@ $("#cal-prev").addEventListener("click", () => shiftMonth(-1));
 $("#cal-next").addEventListener("click", () => shiftMonth(1));
 $("#cal-today").addEventListener("click", () => { const d = new Date(); S.cal = { y: d.getFullYear(), m: d.getMonth(), sel: S.today }; renderCal(); });
 
+/* ---------- rotina ---------- */
+function rotinaItens(){
+  const T = S.today, out = [];
+  const limite = (() => { const d = parseDay(T); d.setDate(d.getDate() + 2); return localISO(d); })();
+  const copiados = new Set([...(S.data.lembretes || []), ...(S.data.dia || [])].filter(c => c.pedido).map(c => c.pedido));
+  const add = (i, origem) => {
+    let score = { alta: 400, media: 200, baixa: 0 }[i.prioridade];
+    const motivos = [];
+    if (i.quando){
+      const d = daysBetween(T, i.quando);
+      if (d < 0){ score += 200 + 10 * Math.min(-d, 30); motivos.push({ text: `atrasado ${-d} ${-d === 1 ? "dia" : "dias"}`, kind: "late" }); }
+      else if (d === 0){ score += 150; motivos.push({ text: "vence hoje", kind: "soon" }); }
+      else if (d === 1){ score += 60; motivos.push({ text: "vence amanhã", kind: "soon" }); }
+      else { score += 20; motivos.push({ text: "vence " + fmtShort(i.quando) }); }
+    }
+    if (origem === "dia"){
+      score += 50;
+      if (i.criadoEm && !i.quando){
+        const dd = daysBetween(dayOf(i.criadoEm), T);
+        if (dd > 0){ score += Math.min(25 * dd, 150); motivos.push({ text: `pendente há ${dd} ${dd === 1 ? "dia" : "dias"}`, kind: dd > 1 ? "late" : "soon" }); }
+      }
+    }
+    if (origem === "lembretes" && !i.quando) score -= 60;
+    const p = origem === "terceiros" ? i : pedidoOf(i);
+    if (p){ score += 40; motivos.push({ text: "pedido de " + nomeDe(p.de), kind: "from" }); }
+    out.push({ item: i, score, motivos });
+  };
+  for (const i of S.data.dia || []) if (!i.feito && (!i.quando || i.quando <= T)) add(i, "dia");
+  for (const i of S.data.lembretes || []) if (!i.feito && (!i.quando || i.quando <= limite)) add(i, "lembretes");
+  for (const i of S.data.terceiros || []) if (!i.feito && !copiados.has(i.id)) add(i, "terceiros");
+  return out.sort((a, b) => b.score - a.score || byCreated(a.item, b.item));
+}
+function renderRotina(){
+  const wrap = $("#rot-groups"), empty = $("#empty-rotina");
+  if (S.data.dia === null || S.data.lembretes === null || S.data.terceiros === null){
+    wrap.replaceChildren(); empty.hidden = false; empty.textContent = "Carregando…"; $("#count-rotina").textContent = "–"; return;
+  }
+  const itens = rotinaItens();
+  $("#count-rotina").textContent = itens.length;
+  markAlta("rotina", itens.map(x => x.item));
+  const feitasHoje = [...S.data.dia, ...S.data.lembretes, ...S.data.terceiros].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === S.today).length;
+  $("#rot-summary").textContent = feitasHoje ? `${feitasHoje} ${feitasHoje === 1 ? "feita" : "feitas"} hoje` : "";
+  empty.hidden = itens.length > 0;
+  empty.textContent = "Nada pendente agora. Quando você criar demandas ou um colega pedir algo, a rotina se monta aqui.";
+  const grupos = [["Comece por aqui", itens.slice(0, 3)], ["Em seguida", itens.slice(3, 8)], ["Se sobrar tempo", itens.slice(8)]];
+  let n = 0;
+  wrap.replaceChildren(...grupos.filter(g => g[1].length).map(([titulo, lista]) => {
+    const g = el("div", "rot-group");
+    g.append(el("h3", "rot-title", titulo));
+    const ol = el("ol", "rot-list"); ol.start = n + 1;
+    for (const x of lista){ n++; ol.append(rotItem(x, n)); }
+    g.append(ol);
+    return g;
+  }));
+}
+function rotItem(x, n){
+  const i = x.item;
+  const li = el("li", "rot-item" + (i.prioridade === "alta" ? " is-alta" : ""));
+  li.dataset.tab = i.tab;
+  const body = el("button", "rot-body"); body.type = "button";
+  body.append(el("span", "rot-text", i.texto || "Sem título"));
+  const meta = el("span", "rot-meta");
+  const src = el("span", "rot-src"); src.append(el("span", "tab-mark"), el("span", null, NOMES[i.tab]));
+  meta.append(prioEl(i.prioridade), src);
+  x.motivos.forEach(m => meta.append(chipEl(m)));
+  body.append(meta);
+  if (i.notas.trim()) body.append(el("span", "rot-notes", i.notas.trim().split("\n")[0]));
+  body.addEventListener("click", () => openEditor(i.key));
+  li.append(el("span", "rot-num", String(n)), checkBtn(i, true), body);
+  return li;
+}
+
 function render(tab){
   if (S.hold){ S.dirty.add(tab); return; }
   if (tab === "lembretes") renderLembretes();
   else if (tab === "dia") renderDia();
   else if (tab === "terceiros") renderTerceiros();
+  else if (tab === "rotina") renderRotina();
   else renderCal();
 }
 function renderAll(){ TABS.forEach(render); }
@@ -542,10 +626,19 @@ async function toggleItem(i){
     for (const c of copiesOf(i)) if (c.feito !== feito) write(() => patchItem(c, patch));
   }
 }
+const fileDeletes = new Map();
+function scheduleFileDelete(key, paths){
+  if (!paths.length) return;
+  clearTimeout(fileDeletes.get(key));
+  fileDeletes.set(key, setTimeout(() => { fileDeletes.delete(key); sb.storage.from(BUCKET).remove(paths).catch(() => {}); }, 8000));
+}
+function cancelFileDelete(key){ clearTimeout(fileDeletes.get(key)); fileDeletes.delete(key); }
+const ownFiles = (i, pasta) => (i.anexos || []).map(a => a.path).filter(p => p.startsWith(`${pasta}/${i.id}/`));
 async function removeSimple(i){
   const row = cardRow(i);
   if (await write(() => q(sb.from("cards").delete().eq("id", i.id)))){
-    toast("Card excluído.", { label: "Desfazer", run: () => write(() => q(sb.from("cards").insert(row))) });
+    scheduleFileDelete(i.key, ownFiles(i, "cards"));
+    toast("Card excluído.", { label: "Desfazer", run: () => { cancelFileDelete(i.key); write(() => q(sb.from("cards").insert(row))); } });
   }
 }
 async function removeRecebido(i){
@@ -554,9 +647,10 @@ async function removeRecebido(i){
   }
 }
 async function removeEnviado(i){
-  const row = { id: i.id, para: i.para, texto: i.texto, notas: i.notas, prioridade: i.prioridade, criado_em: i.criadoEm };
+  const row = { id: i.id, para: i.para, texto: i.texto, notas: i.notas, prioridade: i.prioridade, criado_em: i.criadoEm, anexos: i.anexos || [] };
   if (await write(() => q(sb.from("pedidos").delete().eq("id", i.id)))){
-    toast("Pedido excluído.", { label: "Desfazer", run: () => write(() => q(sb.from("pedidos").insert(row))) });
+    scheduleFileDelete(i.key, ownFiles(i, "pedidos"));
+    toast("Pedido excluído.", { label: "Desfazer", run: () => { cancelFileDelete(i.key); write(() => q(sb.from("pedidos").insert(row))); } });
   }
 }
 async function moveSimple(i, dest){
@@ -565,7 +659,7 @@ async function moveSimple(i, dest){
   if (await move(dest)) toast(`Movido para ${NOMES[dest]}.`, { label: "Desfazer", run: () => move(src) });
 }
 async function copyPedido(p, dest){
-  const ok = await write(() => q(sb.from("cards").insert({ aba: dest, texto: p.texto, notas: p.notas || "", prioridade: p.prioridade, pedido: p.id })));
+  const ok = await write(() => q(sb.from("cards").insert({ aba: dest, texto: p.texto, notas: p.notas || "", prioridade: p.prioridade, pedido: p.id, anexos: p.anexos || [] })));
   if (ok) toast(`Levado para ${NOMES[dest]}.`, { label: "Ver", run: () => activate(dest, false) });
 }
 function dropOn(i, dest){ if (i.tab === "terceiros") copyPedido(i, dest); else moveSimple(i, dest); }
@@ -664,6 +758,7 @@ function openEditor(key){
   del.textContent = i.tab === "terceiros" ? "Remover da minha lista" : i.tab === "enviados" ? "Excluir pedido" : "Excluir card";
   setEdSaved("");
   refreshEditorMeta();
+  $("#ed-anexos").replaceChildren(); renderAnexos();
   ED.modal.hidden = false; html.classList.add("modal-open");
   autosize(ED.title);
   if (window.matchMedia("(hover: hover)").matches){
@@ -736,7 +831,9 @@ function syncEditor(){
   const ed = S.ed; if (!ed) return;
   const ni = findItem(ed.key);
   if (!ni){ closeEditor({ discard: true }); toast("Este card foi removido ou movido."); return; }
+  const mudou = JSON.stringify(ed.item.anexos || []) !== JSON.stringify(ni.anexos || []);
   ed.item = ni; refreshEditorMeta();
+  if (mudou) renderAnexos();
 }
 ED.title.addEventListener("input", () => { autosize(ED.title); markDirty(); });
 ED.title.addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); ED.notes.focus(); } });
@@ -750,6 +847,101 @@ document.querySelectorAll("#ed-prio input").forEach(r => r.addEventListener("cha
   const ed = S.ed; if (!ed || !r.checked || ed.item.prioridade === r.value) return;
   write(() => patchItem(ed.item, { prioridade: r.value }));
 }));
+/* ---------- anexos ---------- */
+const BUCKET = "anexos", MAX_MB = 10;
+const urlCache = new Map();
+async function signedUrls(paths){
+  const now = Date.now(), need = paths.filter(p => !(urlCache.get(p) && urlCache.get(p).exp > now));
+  if (need.length){
+    try {
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(need, 3600);
+      if (!error && data) data.forEach(d => { if (d.signedUrl) urlCache.set(d.path, { url: d.signedUrl, exp: now + 50 * 60000 }); });
+    } catch (e){ console.warn(e); }
+  }
+  return Object.fromEntries(paths.map(p => [p, urlCache.get(p) ? urlCache.get(p).url : null]));
+}
+function seguro(n){ return (n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-80)) || "arquivo"; }
+function extOf(n){ const m = /\.([A-Za-z0-9]{1,5})$/.exec(n || ""); return m ? m[1].toUpperCase() : "ARQ"; }
+function fmtSize(b){ if (typeof b !== "number") return ""; return b < 1048576 ? Math.max(1, Math.round(b / 1024)) + " KB" : (b / 1048576).toFixed(1).replace(".", ",") + " MB"; }
+let anexoSeq = 0;
+async function renderAnexos(){
+  const ed = S.ed; if (!ed) return;
+  const lista = ed.item.anexos || [], box = $("#ed-anexos"), seq = ++anexoSeq;
+  $("#ed-anexos-count").textContent = lista.length ? `(${lista.length})` : "";
+  if (!lista.length){ box.replaceChildren(); return; }
+  const urls = await signedUrls(lista.map(a => a.path));
+  if (seq !== anexoSeq || S.ed !== ed) return;
+  box.replaceChildren(...lista.map(a => anexoEl(a, urls[a.path])));
+}
+function anexoEl(a, url){
+  const isImg = /^image\//.test(a.tipo || "");
+  const item = el("div", "anexo" + (isImg ? " is-img" : ""));
+  const link = el("a", "anexo-link"); link.target = "_blank"; link.rel = "noopener";
+  link.title = isImg ? "Abrir imagem" : "Baixar " + (a.nome || "arquivo");
+  if (url) link.href = isImg ? url : url + (url.includes("?") ? "&" : "?") + "download=" + encodeURIComponent(a.nome || "arquivo");
+  if (isImg){
+    if (url){ const img = document.createElement("img"); img.src = url; img.alt = a.nome || "imagem"; img.loading = "lazy"; link.append(img); }
+    else link.append(el("span", "anexo-ico", "IMG"));
+  } else link.append(el("span", "anexo-ico", extOf(a.nome)), el("span", "anexo-nome", a.nome || "arquivo"), el("span", "anexo-size", fmtSize(a.tamanho)));
+  item.append(link);
+  if (isImg) item.append(el("span", "anexo-cap", a.nome || "imagem"));
+  const del = el("button", "anexo-del"); del.type = "button"; del.setAttribute("aria-label", "Remover " + (a.nome || "anexo"));
+  del.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+  del.addEventListener("click", () => removerAnexo(a));
+  item.append(del);
+  return item;
+}
+async function anexar(files){
+  const ed = S.ed; if (!ed || !files.length) return;
+  const item = ed.item, pasta = (isPedidoTab(item.tab) ? "pedidos/" : "cards/") + item.id;
+  setEdSaved("Enviando anexo…");
+  for (const f of files){
+    if (f.size > MAX_MB * 1048576){ toast(`"${f.name}" passa de ${MAX_MB} MB e não foi anexado.`); continue; }
+    const tipo = f.type || "application/octet-stream";
+    const nome = f.name && f.name !== "image.png" ? f.name : (tipo.startsWith("image/") ? `imagem-${new Date().toLocaleString("pt-BR").replace(/[/:, ]+/g, "-")}.${(tipo.split("/")[1] || "png").replace("jpeg", "jpg")}` : (f.name || "arquivo"));
+    const path = `${pasta}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${seguro(nome)}`;
+    const ok = await write(async () => {
+      const up = await sb.storage.from(BUCKET).upload(path, f, { contentType: tipo, upsert: false });
+      if (up.error) throw up.error;
+      const cur = (findItem(item.key) || item).anexos || [];
+      await patchItem(item, { anexos: [...cur, { path, nome, tipo, tamanho: f.size, em: new Date().toISOString() }] });
+    });
+    if (!ok) break;
+  }
+  if (S.ed === ed){ setEdSaved("Salvo"); renderAnexos(); }
+}
+async function removerAnexo(a){
+  const ed = S.ed; if (!ed) return;
+  const item = ed.item;
+  const depois = (item.anexos || []).filter(x => x.path !== a.path);
+  if (await write(() => patchItem(item, { anexos: depois }))){
+    renderAnexos();
+    scheduleFileDelete(a.path, [a.path]);
+    toast("Anexo removido.", { label: "Desfazer", run: async () => {
+      cancelFileDelete(a.path);
+      const cur = (findItem(item.key) || item).anexos || [];
+      if (await write(() => patchItem(item, { anexos: [...cur, a] }))) renderAnexos();
+    } });
+  }
+}
+$("#ed-file").addEventListener("change", (e) => { const fs = [...e.target.files]; e.target.value = ""; anexar(fs); });
+const edBox = $("#editor");
+edBox.addEventListener("paste", (e) => {
+  const fs = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (fs.length){ e.preventDefault(); anexar(fs); }
+});
+edBox.addEventListener("dragover", (e) => {
+  if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")){ e.preventDefault(); edBox.classList.add("is-drop"); }
+});
+edBox.addEventListener("dragleave", (e) => { if (!edBox.contains(e.relatedTarget)) edBox.classList.remove("is-drop"); });
+edBox.addEventListener("drop", (e) => {
+  edBox.classList.remove("is-drop");
+  const fs = [...((e.dataTransfer && e.dataTransfer.files) || [])];
+  if (fs.length){ e.preventDefault(); anexar(fs); }
+});
+window.addEventListener("dragover", (e) => { if (S.ed && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+window.addEventListener("drop", (e) => { if (S.ed) e.preventDefault(); });
+
 $("#ed-close").addEventListener("click", () => closeEditor());
 ED.modal.querySelector("[data-close]").addEventListener("click", () => closeEditor());
 $("#ed-delete").addEventListener("click", async () => {
@@ -830,6 +1022,7 @@ function activate(tab, focus){
     p.hidden = !on; p.classList.toggle("is-first", S.visible[0] === t);
   }
   storeSet("org.aba", tab);
+  try { $("#tab-" + tab).scrollIntoView({ block: "nearest", inline: "nearest" }); } catch {}
   try { history.replaceState(null, "", "#" + tab); } catch {}
   if (tab === "calendario") renderCal();
   if (focus && window.matchMedia("(hover: hover)").matches){
@@ -977,7 +1170,7 @@ function boot(){
 
 setInterval(() => {
   const t = localISO();
-  if (t !== S.today){ if (S.diaDate === S.today) S.diaDate = t; S.today = t; setToday(); renderAll(); }
+  if (t !== S.today){ if (S.diaDate === S.today) S.diaDate = t; S.today = t; setToday(); renderAll(); if (S.me) scheduleReload(); }
 }, 60000);
 
 boot();
