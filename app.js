@@ -386,6 +386,7 @@ function renderLembretes(){
   });
   markAlta("lembretes", pend);
   const done = data.filter(i => i.feito && !i.arquivado).sort(byDoneDesc);
+  renderRecList();
   fillPanel("lembretes", pend.map(cardEl), done.map(cardEl),
     pend.length ? "" : done.length ? "Tudo resolvido por aqui." : "Nenhum lembrete. Escreva um título acima para criar o primeiro card.");
 }
@@ -461,7 +462,6 @@ function renderDia(){
   $("#tools-dia").hidden = D !== T;
   $("#done-sum-dia").textContent = D < T ? "Feitas neste dia" : "Feitas";
   if (D < T && done.length) $("#done-dia").open = true;
-  renderRecList();
 }
 
 function renderTerceiros(){
@@ -520,9 +520,12 @@ function renderCal(){
     dn.slice(0, 4).forEach(e => { const i = el("i"); i.dataset.tab = e.item.tab; dots.append(i); });
     if (dn.length > 4) dots.append(el("b", null, "+" + (dn.length - 4)));
     if (du.length) dots.append(el("i", "due"));
+    const nr = iso >= S.today ? S.recs.filter(r => ocorreEm(r, iso)).length : 0;
+    if (nr) dots.append(el("i", "rec"));
     b.append(dots);
     let label = `${d} de ${MESES_LONGOS[m]}: ${dn.length} ${dn.length === 1 ? "concluída" : "concluídas"}`;
     if (du.length) label += `, ${du.length} com prazo`;
+    if (nr) label += `, ${nr} ${nr === 1 ? "recorrente" : "recorrentes"}`;
     b.setAttribute("aria-label", label);
     b.addEventListener("click", () => { S.cal.sel = iso; S.diaDate = iso; renderCal(); render("dia"); });
     cells.push(b);
@@ -559,8 +562,25 @@ function renderCal(){
   $("#day-done").replaceChildren(...other.map(e => miniRow(e.item, hm(e.item.feitoEm))));
   $("#day-due-wrap").hidden = !du.length;
   $("#day-due").replaceChildren(...du.sort((a, b) => byPrio(a.item, b.item)).map(e => miniRow(e.item, e.item.tab === "lembretes" ? "lembrete" : "do dia", true)));
+  // Recorrentes previstas para hoje e dias futuros (dias passados já aparecem no fechamento).
+  const geradas = new Set((S.data.dia || []).concat(S.data.lembretes || []).filter(c => c.recorrencia && c.quando === sel).map(c => c.recorrencia));
+  const recs = sel >= S.today ? S.recs.filter(r => ocorreEm(r, sel) && !geradas.has(r.id)) : [];
+  $("#day-rec-wrap").hidden = !recs.length;
+  $("#day-rec").replaceChildren(...recs.map(r => {
+    const row = el("div", "mini mini-static"); row.dataset.tab = "lembretes";
+    const mid = el("span");
+    mid.append(el("span", "mini-title", r.texto), el("span", "mini-notes", `Prioridade ${PRIO_NOME[r.prioridade].toLowerCase()} · ${descRec(r)}`));
+    row.append(el("span", "mini-mark"), mid, el("span", "mini-time", "repete"));
+    return row;
+  }));
+  // Adicionar compromisso no dia escolhido
+  const addF = $("#cal-add");
+  addF.hidden = sel < S.today;
+  if (!addF.hidden) $("#cal-add-hint").textContent = sel === S.today
+    ? "Entra direto nas Demandas do dia de hoje."
+    : `Fica em Lembretes e entra sozinho nas Demandas do dia em ${fmtShort(sel)}.`;
   const empty = $("#day-empty");
-  empty.hidden = !!(hasClose || other.length || du.length);
+  empty.hidden = !!(hasClose || other.length || du.length || recs.length);
   empty.textContent = S.data.dia === null ? "Carregando…"
     : diff > 0 ? "Nada registrado neste dia." : diff === 0 ? "Nada feito hoje ainda. As Demandas do dia e os cards concluídos aparecem aqui." : "Nenhum prazo para este dia.";
 }
@@ -584,6 +604,20 @@ function shiftMonth(n){
   renderCal();
 }
 $("#day-open-dia").addEventListener("click", () => { S.diaDate = S.cal.sel; render("dia"); activate("dia", false); window.scrollTo({ top: 0 }); });
+$("#cal-add").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("#cal-add-in"), texto = input.value.replace(/\s+/g, " ").trim();
+  if (!texto){ input.focus(); return; }
+  const quando = S.cal.sel, prioridade = prioOf($("#cal-add-prio").value);
+  if (quando < S.today) return;
+  input.value = "";
+  const ok = await write(() => q(sb.from("cards").insert(quando === S.today
+    ? { aba: "dia", texto, quando, prioridade }
+    : { aba: "lembretes", texto, quando, prioridade })));
+  if (ok){ $("#cal-add-prio").value = "media"; toast(quando === S.today ? "Adicionado às Demandas do dia de hoje." : `Marcado para ${fmtShort(quando)}.`); }
+  else input.value = texto;
+  input.focus();
+});
 $("#cal-prev").addEventListener("click", () => shiftMonth(-1));
 $("#cal-next").addEventListener("click", () => shiftMonth(1));
 $("#cal-today").addEventListener("click", () => { const d = new Date(); S.cal = { y: d.getFullYear(), m: d.getMonth(), sel: S.today }; renderCal(); });
@@ -1223,11 +1257,7 @@ function bindForm(formId, inputId, build){
     input.focus();
   });
 }
-bindForm("#form-lembretes", "#in-lembretes", () => {
-  const dateEl = $("#date-lembretes"), quando = isDay(dateEl.value) ? dateEl.value : null, prioridade = readPrio("lembretes");
-  return { save: (texto) => q(sb.from("cards").insert({ aba: "lembretes", texto, quando, prioridade })),
-    after: () => { dateEl.value = ""; resetPrio("lembretes"); } };
-});
+
 function renderRecList(){
   const ativas = S.recs.filter(recAtiva);
   const wrap = $("#rec-wrap");
@@ -1259,10 +1289,11 @@ function syncRepUI(){
   extra.hidden = v === "nao";
   $("#rep-dias").hidden = v !== "semanal";
   $("#rep-mes-wrap").hidden = v !== "mensal";
-  if (v !== "nao" && !$("#rep-inicio").value) $("#rep-inicio").value = S.diaDate > S.today ? S.diaDate : S.today;
+  if (v !== "nao" && !$("#rep-inicio").value) $("#rep-inicio").value = isDay($("#date-lembretes").value) ? $("#date-lembretes").value : S.today;
+  $("#date-lembretes").hidden = v !== "nao";
   if (v === "mensal" && !$("#rep-mes").value){ const ini = $("#rep-inicio").value || S.today; $("#rep-mes").value = parseDay(ini).getDate(); }
   if (v === "semanal" && !document.querySelector("#rep-dias input:checked")){ const wd = parseDay($("#rep-inicio").value || S.today).getDay(); const c = $("#rep-d" + wd); if (c) c.checked = true; }
-  $("#form-dia .btn").textContent = v === "nao" ? "Criar card" : "Criar recorrente";
+  $("#form-lembretes .btn").textContent = v === "nao" ? "Criar card" : "Criar recorrente";
 }
 $("#rep-dia").addEventListener("change", syncRepUI);
 function resetRep(){
@@ -1271,10 +1302,15 @@ function resetRep(){
   syncRepUI();
 }
 bindForm("#form-dia", "#in-dia", () => {
-  const prioridade = readPrio("dia"), rep = $("#rep-dia").value;
+  const prioridade = readPrio("dia"), quando = S.diaDate > S.today ? S.diaDate : null;
+  return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, prioridade })), after: () => resetPrio("dia") };
+});
+bindForm("#form-lembretes", "#in-lembretes", () => {
+  const prioridade = readPrio("lembretes"), rep = $("#rep-dia").value;
   if (rep === "nao"){
-    const quando = S.diaDate > S.today ? S.diaDate : null;
-    return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, prioridade })), after: () => resetPrio("dia") };
+    const dateEl = $("#date-lembretes"), quando = isDay(dateEl.value) ? dateEl.value : null;
+    return { save: (texto) => q(sb.from("cards").insert({ aba: "lembretes", texto, quando, prioridade })),
+      after: () => { dateEl.value = ""; resetPrio("lembretes"); } };
   }
   if (S.recsOff){ toast("As demandas recorrentes ainda não foram ativadas no Supabase. Rode o arquivo atualizacao-2-recorrentes.sql (veja o README)."); return null; }
   const inicio = isDay($("#rep-inicio").value) ? $("#rep-inicio").value : S.today;
@@ -1286,9 +1322,9 @@ bindForm("#form-dia", "#in-dia", () => {
   return {
     save: (texto) => q(sb.from("recorrencias").insert({ texto, prioridade, frequencia: rep, dias_semana: rep === "semanal" ? dias : [], dia_mes: rep === "mensal" ? diaMes : null, inicio, fim })),
     after: async () => {
-      resetPrio("dia"); resetRep();
+      resetPrio("lembretes"); resetRep(); $("#date-lembretes").value = "";
       await loadRecorrencias(); await gerarRecorrencias(); renderAll();
-      toast("Demanda recorrente criada. Ela aparece sozinha em Demandas do dia nos dias escolhidos.");
+      toast("Lembrete recorrente criado. Ele aparece sozinho em Demandas do dia nos dias escolhidos.");
     }
   };
 });

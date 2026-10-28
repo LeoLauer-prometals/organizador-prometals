@@ -119,18 +119,39 @@
     <form class="add" id="form-lembretes" autocomplete="off">
       <label class="sr" for="in-lembretes">Título do novo lembrete</label>
       <input class="field grow" id="in-lembretes" placeholder="Título, ex.: Renovar o seguro do carro" maxlength="280">
+      <label class="sr" for="rep-dia">Repetir</label>
+      <select class="field rep-sel" id="rep-dia">
+        <option value="nao">Não repete</option>
+        <option value="diaria">Todo dia</option>
+        <option value="uteis">Dias úteis (seg a sex)</option>
+        <option value="semanal">Dias da semana…</option>
+        <option value="mensal">Todo mês</option>
+      </select>
       <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-lembretes"><label data-p="alta"><input type="radio" name="prio-lembretes" id="prio-lembretes-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-lembretes" id="prio-lembretes-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-lembretes" id="prio-lembretes-baixa" value="baixa"><i></i>Baixa</label></div>
       <label class="sr" for="date-lembretes">Data (opcional)</label>
       <input class="field" type="date" id="date-lembretes">
       <button class="btn" type="submit">Criar card</button>
+      <div class="rep-extra" id="rep-extra" hidden>
+        <div class="rep-dias" id="rep-dias" role="group" aria-label="Dias da semana" hidden>
+          <label><input type="checkbox" id="rep-d1" value="1"><span>seg</span></label><label><input type="checkbox" id="rep-d2" value="2"><span>ter</span></label><label><input type="checkbox" id="rep-d3" value="3"><span>qua</span></label><label><input type="checkbox" id="rep-d4" value="4"><span>qui</span></label><label><input type="checkbox" id="rep-d5" value="5"><span>sex</span></label><label><input type="checkbox" id="rep-d6" value="6"><span>sáb</span></label><label><input type="checkbox" id="rep-d0" value="0"><span>dom</span></label>
+        </div>
+        <label class="rep-field" id="rep-mes-wrap" hidden>No dia <input class="field" type="number" id="rep-mes" min="1" max="31" inputmode="numeric"> de cada mês</label>
+        <label class="rep-field">De <input class="field" type="date" id="rep-inicio"></label>
+        <label class="rep-field">Até <input class="field" type="date" id="rep-fim"> <small>(opcional)</small></label>
+      </div>
     </form>
-    <p class="tip">Lembretes com data entram sozinhos nas Demandas do dia quando a data chega. Clique num card para anotar os detalhes.</p>
+    <p class="tip">Lembretes com data entram sozinhos nas Demandas do dia quando a data chega. Use <b>Repetir</b> para algo que acontece todo dia, em dias da semana ou todo mês, como uma reunião em dezembro.</p>
     <p class="empty" id="empty-lembretes">Carregando…</p>
     <div class="grid" id="list-lembretes"></div>
     <details class="done" id="done-lembretes" hidden>
       <summary><span>Resolvidos (<span id="done-count-lembretes">0</span>)</span></summary>
       <div class="done-tools"><p>Arquivados saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="lembretes">Arquivar resolvidos</button></div>
       <div class="grid" id="done-list-lembretes"></div>
+    </details>
+    <details class="done" id="rec-wrap" hidden>
+      <summary><span>Lembretes recorrentes (<span id="rec-count">0</span>)</span></summary>
+      <p class="done-tools"><span>Lembretes que entram sozinhos em Demandas do dia nos dias escolhidos.</span></p>
+      <div class="rec-list" id="rec-list"></div>
     </details>
   </section>
 
@@ -153,24 +174,8 @@
     <form class="add two" id="form-dia" autocomplete="off">
       <label class="sr" for="in-dia">Título da nova demanda</label>
       <input class="field grow" id="in-dia" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
-      <label class="sr" for="rep-dia">Repetir</label>
-      <select class="field rep-sel" id="rep-dia">
-        <option value="nao">Não repete</option>
-        <option value="diaria">Todo dia</option>
-        <option value="uteis">Dias úteis (seg a sex)</option>
-        <option value="semanal">Dias da semana…</option>
-        <option value="mensal">Todo mês</option>
-      </select>
       <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-dia"><label data-p="alta"><input type="radio" name="prio-dia" id="prio-dia-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-dia" id="prio-dia-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-dia" id="prio-dia-baixa" value="baixa"><i></i>Baixa</label></div>
       <button class="btn" type="submit">Criar card</button>
-      <div class="rep-extra" id="rep-extra" hidden>
-        <div class="rep-dias" id="rep-dias" role="group" aria-label="Dias da semana" hidden>
-          <label><input type="checkbox" id="rep-d1" value="1"><span>seg</span></label><label><input type="checkbox" id="rep-d2" value="2"><span>ter</span></label><label><input type="checkbox" id="rep-d3" value="3"><span>qua</span></label><label><input type="checkbox" id="rep-d4" value="4"><span>qui</span></label><label><input type="checkbox" id="rep-d5" value="5"><span>sex</span></label><label><input type="checkbox" id="rep-d6" value="6"><span>sáb</span></label><label><input type="checkbox" id="rep-d0" value="0"><span>dom</span></label>
-        </div>
-        <label class="rep-field" id="rep-mes-wrap" hidden>No dia <input class="field" type="number" id="rep-mes" min="1" max="31" inputmode="numeric"> de cada mês</label>
-        <label class="rep-field">De <input class="field" type="date" id="rep-inicio"></label>
-        <label class="rep-field">Até <input class="field" type="date" id="rep-fim"> <small>(opcional)</small></label>
-      </div>
     </form>
     <p class="tip" id="tip-dia">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
     <p class="empty" id="empty-dia">Carregando…</p>
@@ -179,11 +184,6 @@
       <summary><span><span id="done-sum-dia">Feitas</span> (<span id="done-count-dia">0</span>)</span></summary>
       <div class="done-tools" id="tools-dia"><p>As feitas de hoje ficam aqui; amanhã elas aparecem só no dia em que foram concluídas.</p><button class="link-btn" type="button" data-archive="dia">Arquivar agora</button></div>
       <div class="grid" id="done-list-dia"></div>
-    </details>
-    <details class="done" id="rec-wrap" hidden>
-      <summary><span>Recorrentes (<span id="rec-count">0</span>)</span></summary>
-      <p class="done-tools"><span>Demandas que entram sozinhas em Demandas do dia nos dias escolhidos.</span></p>
-      <div class="rec-list" id="rec-list"></div>
     </details>
   </section>
 
@@ -251,12 +251,21 @@
           <span data-tab="dia"><i></i>Do dia</span>
           <span data-tab="terceiros"><i></i>Terceiros</span>
           <span><i class="due"></i>Prazo pendente</span>
+          <span><i class="rec"></i>Recorrente</span>
         </div>
       </div>
       <div class="day" aria-live="polite">
         <h3 id="day-title"></h3>
         <p class="day-sub" id="day-sub"></p>
         <p style="margin:12px 0 0"><button class="move-btn" type="button" data-tab="dia" id="day-open-dia"><span class="tab-mark"></span><span>Ver este dia em Demandas do dia</span></button></p>
+        <form class="cal-add" id="cal-add" autocomplete="off" hidden>
+          <label class="sr" for="cal-add-in">Adicionar neste dia</label>
+          <input class="field" id="cal-add-in" maxlength="280" placeholder="Marcar neste dia, ex.: Reunião com o cliente X">
+          <label class="sr" for="cal-add-prio">Prioridade</label>
+          <select class="field" id="cal-add-prio"><option value="alta">Alta</option><option value="media" selected>Média</option><option value="baixa">Baixa</option></select>
+          <button class="btn" type="submit">Marcar</button>
+          <p class="cal-add-hint" id="cal-add-hint"></p>
+        </form>
         <div id="close-wrap">
           <h4 id="close-title">Fechamento das demandas do dia</h4>
           <div class="close-bar" aria-hidden="true"><span id="close-fill"></span></div>
@@ -266,6 +275,7 @@
         </div>
         <div id="day-done-wrap"><h4>Outras concluídas neste dia</h4><div class="day-list" id="day-done"></div></div>
         <div id="day-due-wrap"><h4>Com prazo neste dia</h4><div class="day-list" id="day-due"></div></div>
+        <div id="day-rec-wrap" hidden><h4>Recorrentes neste dia</h4><div class="day-list" id="day-rec"></div></div>
         <p class="empty" id="day-empty"></p>
       </div>
     </div>
