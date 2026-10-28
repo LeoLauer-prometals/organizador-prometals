@@ -75,7 +75,7 @@ function rowToCard(r){
   return { tab: r.aba, id: r.id, key: `${r.aba}|${r.id}`, texto: r.texto || "", notas: r.notas || "",
     quando: r.quando || null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
     criadoEm: r.criado_em || null, arquivado: !!r.arquivado, pedido: r.pedido || null,
-    anexos: Array.isArray(r.anexos) ? r.anexos : [] };
+    anexos: Array.isArray(r.anexos) ? r.anexos : [], recorrencia: r.recorrencia || null };
 }
 function rowToPedido(r, tab){
   return { tab, id: r.id, key: `${tab}|${r.id}`, de: r.de, para: r.para, texto: r.texto || "", notas: r.notas || "",
@@ -94,7 +94,7 @@ function toRow(patch, pedido){
 }
 function cardRow(i){
   return { id: i.id, aba: i.tab, texto: i.texto, notas: i.notas || "", quando: i.quando, prioridade: i.prioridade,
-    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm, anexos: i.anexos || [] };
+    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm, anexos: i.anexos || [], recorrencia: i.recorrencia || null };
 }
 
 async function loadPerfis(){
@@ -116,6 +116,57 @@ async function loadPedidos(){
   const unknown = rows.some(r => !S.perfis[r.de] || !S.perfis[r.para]);
   if (unknown) await loadPerfis();
 }
+/* ---------- demandas recorrentes ---------- */
+S.recs = []; S.recsOff = false;
+async function loadRecorrencias(){
+  const { data, error } = await sb.from("recorrencias").select("*").eq("dono", S.me.id).order("criado_em");
+  if (error){ S.recs = []; S.recsOff = true; return; }
+  S.recsOff = false;
+  S.recs = data.map(r => ({ id: r.id, texto: r.texto, notas: r.notas || "", prioridade: prioOf(r.prioridade), frequencia: r.frequencia,
+    dias: Array.isArray(r.dias_semana) ? r.dias_semana : [], diaMes: r.dia_mes || null, inicio: r.inicio, fim: r.fim || null, ultima: r.ultima_gerada || null }));
+}
+function ocorreEm(rec, iso){
+  if (iso < rec.inicio || (rec.fim && iso > rec.fim)) return false;
+  const d = parseDay(iso), wd = d.getDay();
+  if (rec.frequencia === "diaria") return true;
+  if (rec.frequencia === "uteis") return wd >= 1 && wd <= 5;
+  if (rec.frequencia === "semanal") return rec.dias.includes(wd);
+  if (rec.frequencia === "mensal"){
+    const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return d.getDate() === Math.min(rec.diaMes || 1, ultimo);
+  }
+  return false;
+}
+const DIAS_NOME = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+function listaPt(a){ return a.length <= 1 ? a.join("") : a.slice(0, -1).join(", ") + " e " + a[a.length - 1]; }
+function descRec(rec){
+  const f = rec.frequencia === "diaria" ? "Todo dia" : rec.frequencia === "uteis" ? "Dias úteis (seg a sex)"
+    : rec.frequencia === "semanal" ? "Toda " + listaPt([...rec.dias].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DIAS_NOME[d]))
+    : `Todo dia ${rec.diaMes} do mês`;
+  const per = rec.fim ? `de ${fmtShort(rec.inicio)} a ${fmtShort(rec.fim)}` : rec.inicio > S.today ? `a partir de ${fmtShort(rec.inicio)}` : "sem data para acabar";
+  return `${f} · ${per}`;
+}
+const recAtiva = (rec) => !rec.fim || rec.fim >= S.today;
+// Cria o card de hoje de cada recorrência (uma vez por dia; excluir o card não faz ele voltar).
+const tentouGerar = new Set();
+async function gerarRecorrencias(){
+  const T = S.today;
+  const pend = S.recs.filter(r => (!r.ultima || r.ultima < T) && ocorreEm(r, T) && !tentouGerar.has(r.id + T));
+  if (!pend.length) return false;
+  pend.forEach(r => tentouGerar.add(r.id + T));
+  try {
+    const rows = pend.map(r => ({ aba: "dia", texto: r.texto, notas: r.notas, prioridade: r.prioridade, quando: T, recorrencia: r.id }));
+    await q(sb.from("cards").upsert(rows, { onConflict: "recorrencia,quando", ignoreDuplicates: true }));
+    await q(sb.from("recorrencias").update({ ultima_gerada: T }).in("id", pend.map(r => r.id)));
+    pend.forEach(r => { r.ultima = T; });
+    await loadCards();
+    return true;
+  } catch (e){ console.warn(e); return false; }
+}
+const recDe = (i) => i && i.recorrencia ? S.recs.find(r => r.id === i.recorrencia) || null : null;
+// Card de recorrência de um dia que já passou não acumula: fica registrado só naquele dia.
+const vencidoRec = (i, iso) => !!i.recorrencia && !!i.quando && i.quando < iso;
+
 // Lembretes com data entram sozinhos nas Demandas do dia quando a data chega.
 const tentouMover = new Set();
 async function autoMoveLembretes(){
@@ -127,8 +178,9 @@ async function autoMoveLembretes(){
 }
 async function reloadAll(){
   try {
-    await Promise.all([loadCards(), loadPedidos()]);
+    await Promise.all([loadCards(), loadPedidos(), loadRecorrencias()]);
     await autoMoveLembretes();
+    await gerarRecorrencias();
     renderAll(); syncEditor();
     $("#banner").hidden = true;
   } catch (e){
@@ -238,7 +290,9 @@ function pedidoOf(c){ return c.pedido ? (S.data.terceiros || []).find(p => p.id 
 function chipsSimple(i){
   const c = [];
   if (i.pedido) c.push({ text: "de terceiros", kind: "from" });
-  if (i.quando) c.push(dueChip(i.quando, i.feito));
+  const rc = recDe(i);
+  if (i.recorrencia) c.push({ text: rc ? "repete: " + descRec(rc).split(" · ")[0].toLowerCase() : "recorrente" });
+  else if (i.quando) c.push(dueChip(i.quando, i.feito));
   if (i.tab === "dia" && !i.feito && i.criadoEm && !i.quando){
     const iso = dayOf(i.criadoEm), diff = daysBetween(iso, S.today);
     if (diff === 1) c.push({ text: "desde ontem", kind: "soon" });
@@ -356,6 +410,7 @@ function closingOf(iso){
   const pendentes = dia.filter(i => {
     if (!i.criadoEm || dayOf(i.criadoEm) > iso) return false;
     if (i.quando && i.quando > iso) return false;
+    if (vencidoRec(i, iso)) return false;
     if (!i.feito) return true;
     return !!i.feitoEm && dayOf(i.feitoEm) > iso;
   });
@@ -367,7 +422,7 @@ function renderDia(){
   if (data === null){ $("#progress-dia").textContent = ""; $("#dia-note").hidden = true; return waitingPanel("dia"); }
   const D = S.diaDate, T = S.today;
   const sortP = (a, b) => byPrio(a, b) || byCreated(a, b);
-  const todayPend = data.filter(i => !i.feito && (!i.quando || i.quando <= T)).sort(sortP);
+  const todayPend = data.filter(i => !i.feito && (!i.quando || i.quando <= T) && !vencidoRec(i, T)).sort(sortP);
   markAlta("dia", todayPend);
   let pend, done, empty, noteText = "";
   if (D === T){
@@ -388,12 +443,14 @@ function renderDia(){
     $("#progress-dia").textContent = (pend.length + done.length) ? `${done.length} de ${pend.length + done.length} feitas` : "";
   } else {
     // Dia futuro: o que está pendente hoje passa para este dia se não for concluído, mais o que foi agendado para ele.
-    pend = data.filter(i => !i.feito && (!i.quando || i.quando <= D))
+    pend = data.filter(i => !i.feito && (!i.quando || i.quando <= D) && !i.recorrencia)
       .concat((S.data.lembretes || []).filter(i => !i.feito && i.quando && i.quando > T && i.quando <= D)).sort(sortP);
     done = [];
     const agendadas = pend.filter(i => i.quando === D).length, passam = pend.length - agendadas;
     noteText = `Previsão para este dia: ${passam} ${passam === 1 ? "demanda pendente passa" : "demandas pendentes passam"} para cá se não forem concluídas antes` +
       (agendadas ? `, mais ${agendadas} ${agendadas === 1 ? "agendada" : "agendadas"} para esta data.` : ".");
+    const recsDia = S.recs.filter(r => ocorreEm(r, D));
+    if (recsDia.length) noteText += ` Recorrentes que aparecem neste dia: ${listaPt(recsDia.map(r => r.texto))}.`;
     empty = pend.length ? "" : "Nada previsto. Crie um card acima para agendar para este dia.";
     $("#progress-dia").textContent = "";
   }
@@ -404,6 +461,7 @@ function renderDia(){
   $("#tools-dia").hidden = D !== T;
   $("#done-sum-dia").textContent = D < T ? "Feitas neste dia" : "Feitas";
   if (D < T && done.length) $("#done-dia").open = true;
+  renderRecList();
 }
 
 function renderTerceiros(){
@@ -436,7 +494,7 @@ function doneEntries(){
 }
 function dueEntries(){
   const out = [];
-  for (const tab of ["lembretes", "dia"]) for (const i of S.data[tab] || []) if (!i.feito && i.quando) out.push({ item: i, day: i.quando });
+  for (const tab of ["lembretes", "dia"]) for (const i of S.data[tab] || []) if (!i.feito && i.quando && !i.recorrencia) out.push({ item: i, day: i.quando });
   return out;
 }
 function groupBy(list){ const g = {}; for (const e of list) (g[e.day] = g[e.day] || []).push(e); return g; }
@@ -538,7 +596,7 @@ function rotinaItens(){
   const add = (i, origem) => {
     let score = { alta: 400, media: 200, baixa: 0 }[i.prioridade];
     const motivos = [];
-    if (i.quando){
+    if (i.quando && !i.recorrencia){
       const d = daysBetween(T, i.quando);
       if (d < 0){ score += 200 + 10 * Math.min(-d, 30); motivos.push({ text: `atrasado ${-d} ${-d === 1 ? "dia" : "dias"}`, kind: "late" }); }
       else if (d === 0){ score += 150; motivos.push({ text: "vence hoje", kind: "soon" }); }
@@ -557,7 +615,7 @@ function rotinaItens(){
     if (p){ score += 40; motivos.push({ text: "pedido de " + nomeDe(p.de), kind: "from" }); }
     out.push({ item: i, score, motivos });
   };
-  for (const i of S.data.dia || []) if (!i.feito && (!i.quando || i.quando <= T)) add(i, "dia");
+  for (const i of S.data.dia || []) if (!i.feito && (!i.quando || i.quando <= T) && !vencidoRec(i, T)) add(i, "dia");
   for (const i of S.data.lembretes || []) if (!i.feito && (!i.quando || i.quando <= limite)) add(i, "lembretes");
   for (const i of S.data.terceiros || []) if (!i.feito && !copiados.has(i.id)) add(i, "terceiros");
   return out.sort((a, b) => b.score - a.score || byCreated(a.item, b.item));
@@ -790,6 +848,13 @@ function refreshEditorMeta(){
   } else if (i.tab === "lembretes" || i.tab === "dia"){
     mv.append(el("span", "ed-move-label", "Mover para"));
     for (const t of dropTargets(i)) mv.append(moveBtn(t, async () => { const it = await closeEditor(); if (it) moveSimple(it, t); }));
+    const rc = recDe(i);
+    if (rc && recAtiva(rc)){
+      a.append(chipEl({ text: "repete: " + descRec(rc).toLowerCase() }));
+      const b = el("button", "link-btn danger-btn", "Parar de repetir"); b.type = "button";
+      b.addEventListener("click", () => pararRecorrencia(rc));
+      mv.append(b);
+    }
   }
 }
 function moveBtn(tab, run){
@@ -1163,9 +1228,69 @@ bindForm("#form-lembretes", "#in-lembretes", () => {
   return { save: (texto) => q(sb.from("cards").insert({ aba: "lembretes", texto, quando, prioridade })),
     after: () => { dateEl.value = ""; resetPrio("lembretes"); } };
 });
+function renderRecList(){
+  const ativas = S.recs.filter(recAtiva);
+  const wrap = $("#rec-wrap");
+  wrap.hidden = !ativas.length;
+  $("#rec-count").textContent = ativas.length;
+  $("#rec-list").replaceChildren(...ativas.map(r => {
+    const row = el("div", "rec-row");
+    const mid = el("div", "rec-mid");
+    mid.append(el("span", "rec-title", r.texto), el("span", "rec-desc", descRec(r)));
+    const stop = el("button", "link-btn danger-btn", "Parar de repetir"); stop.type = "button";
+    stop.addEventListener("click", () => pararRecorrencia(r));
+    row.append(prioEl(r.prioridade), mid, stop);
+    return row;
+  }));
+}
+async function pararRecorrencia(r){
+  const ontem = (() => { const d = parseDay(S.today); d.setDate(d.getDate() - 1); return localISO(d); })();
+  const antes = r.fim;
+  const ok = !r.ultima
+    ? await write(() => q(sb.from("recorrencias").delete().eq("id", r.id)))
+    : await write(() => q(sb.from("recorrencias").update({ fim: ontem }).eq("id", r.id)));
+  if (!ok) return;
+  const row = { id: r.id, texto: r.texto, notas: r.notas, prioridade: r.prioridade, frequencia: r.frequencia, dias_semana: r.dias, dia_mes: r.diaMes, inicio: r.inicio, fim: r.fim, ultima_gerada: r.ultima };
+  toast(`"${r.texto}" não vai mais se repetir. O card de hoje, se já existir, continua na lista.`, { label: "Desfazer", run: () =>
+    write(() => r.ultima ? q(sb.from("recorrencias").update({ fim: antes }).eq("id", r.id)) : q(sb.from("recorrencias").insert(row))) });
+}
+function syncRepUI(){
+  const v = $("#rep-dia").value, extra = $("#rep-extra");
+  extra.hidden = v === "nao";
+  $("#rep-dias").hidden = v !== "semanal";
+  $("#rep-mes-wrap").hidden = v !== "mensal";
+  if (v !== "nao" && !$("#rep-inicio").value) $("#rep-inicio").value = S.diaDate > S.today ? S.diaDate : S.today;
+  if (v === "mensal" && !$("#rep-mes").value){ const ini = $("#rep-inicio").value || S.today; $("#rep-mes").value = parseDay(ini).getDate(); }
+  if (v === "semanal" && !document.querySelector("#rep-dias input:checked")){ const wd = parseDay($("#rep-inicio").value || S.today).getDay(); const c = $("#rep-d" + wd); if (c) c.checked = true; }
+  $("#form-dia .btn").textContent = v === "nao" ? "Criar card" : "Criar recorrente";
+}
+$("#rep-dia").addEventListener("change", syncRepUI);
+function resetRep(){
+  $("#rep-dia").value = "nao"; $("#rep-inicio").value = ""; $("#rep-fim").value = ""; $("#rep-mes").value = "";
+  document.querySelectorAll("#rep-dias input").forEach(c => { c.checked = false; });
+  syncRepUI();
+}
 bindForm("#form-dia", "#in-dia", () => {
-  const prioridade = readPrio("dia"), quando = S.diaDate > S.today ? S.diaDate : null;
-  return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, prioridade })), after: () => resetPrio("dia") };
+  const prioridade = readPrio("dia"), rep = $("#rep-dia").value;
+  if (rep === "nao"){
+    const quando = S.diaDate > S.today ? S.diaDate : null;
+    return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, prioridade })), after: () => resetPrio("dia") };
+  }
+  if (S.recsOff){ toast("As demandas recorrentes ainda não foram ativadas no Supabase. Rode o arquivo atualizacao-2-recorrentes.sql (veja o README)."); return null; }
+  const inicio = isDay($("#rep-inicio").value) ? $("#rep-inicio").value : S.today;
+  const fim = isDay($("#rep-fim").value) ? $("#rep-fim").value : null;
+  const dias = [...document.querySelectorAll("#rep-dias input:checked")].map(c => Number(c.value));
+  const diaMes = Math.min(31, Math.max(1, parseInt($("#rep-mes").value, 10) || parseDay(inicio).getDate()));
+  if (fim && fim < inicio){ toast("A data final precisa ser depois da data de início."); return null; }
+  if (rep === "semanal" && !dias.length){ toast("Escolha pelo menos um dia da semana."); return null; }
+  return {
+    save: (texto) => q(sb.from("recorrencias").insert({ texto, prioridade, frequencia: rep, dias_semana: rep === "semanal" ? dias : [], dia_mes: rep === "mensal" ? diaMes : null, inicio, fim })),
+    after: async () => {
+      resetPrio("dia"); resetRep();
+      await loadRecorrencias(); await gerarRecorrencias(); renderAll();
+      toast("Demanda recorrente criada. Ela aparece sozinha em Demandas do dia nos dias escolhidos.");
+    }
+  };
 });
 bindForm("#form-enviar", "#in-enviar", () => {
   const sel = $("#para-enviar"), para = sel.value;
@@ -1224,6 +1349,7 @@ function subscribe(){
     .on("postgres_changes", { event: "*", schema: "public", table: "cards", filter: `dono=eq.${id}` }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: "pedidos", filter: `para=eq.${id}` }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: "pedidos", filter: `de=eq.${id}` }, scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "recorrencias", filter: `dono=eq.${id}` }, scheduleReload)
     .subscribe((status) => {
       if (status === "SUBSCRIBED") setSync(S.pending ? "saving" : "ok");
       else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setSync("off");

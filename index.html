@@ -153,8 +153,24 @@
     <form class="add two" id="form-dia" autocomplete="off">
       <label class="sr" for="in-dia">Título da nova demanda</label>
       <input class="field grow" id="in-dia" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
+      <label class="sr" for="rep-dia">Repetir</label>
+      <select class="field rep-sel" id="rep-dia">
+        <option value="nao">Não repete</option>
+        <option value="diaria">Todo dia</option>
+        <option value="uteis">Dias úteis (seg a sex)</option>
+        <option value="semanal">Dias da semana…</option>
+        <option value="mensal">Todo mês</option>
+      </select>
       <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-dia"><label data-p="alta"><input type="radio" name="prio-dia" id="prio-dia-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-dia" id="prio-dia-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-dia" id="prio-dia-baixa" value="baixa"><i></i>Baixa</label></div>
       <button class="btn" type="submit">Criar card</button>
+      <div class="rep-extra" id="rep-extra" hidden>
+        <div class="rep-dias" id="rep-dias" role="group" aria-label="Dias da semana" hidden>
+          <label><input type="checkbox" id="rep-d1" value="1"><span>seg</span></label><label><input type="checkbox" id="rep-d2" value="2"><span>ter</span></label><label><input type="checkbox" id="rep-d3" value="3"><span>qua</span></label><label><input type="checkbox" id="rep-d4" value="4"><span>qui</span></label><label><input type="checkbox" id="rep-d5" value="5"><span>sex</span></label><label><input type="checkbox" id="rep-d6" value="6"><span>sáb</span></label><label><input type="checkbox" id="rep-d0" value="0"><span>dom</span></label>
+        </div>
+        <label class="rep-field" id="rep-mes-wrap" hidden>No dia <input class="field" type="number" id="rep-mes" min="1" max="31" inputmode="numeric"> de cada mês</label>
+        <label class="rep-field">De <input class="field" type="date" id="rep-inicio"></label>
+        <label class="rep-field">Até <input class="field" type="date" id="rep-fim"> <small>(opcional)</small></label>
+      </div>
     </form>
     <p class="tip" id="tip-dia">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
     <p class="empty" id="empty-dia">Carregando…</p>
@@ -163,6 +179,11 @@
       <summary><span><span id="done-sum-dia">Feitas</span> (<span id="done-count-dia">0</span>)</span></summary>
       <div class="done-tools" id="tools-dia"><p>As feitas de hoje ficam aqui; amanhã elas aparecem só no dia em que foram concluídas.</p><button class="link-btn" type="button" data-archive="dia">Arquivar agora</button></div>
       <div class="grid" id="done-list-dia"></div>
+    </details>
+    <details class="done" id="rec-wrap" hidden>
+      <summary><span>Recorrentes (<span id="rec-count">0</span>)</span></summary>
+      <p class="done-tools"><span>Demandas que entram sozinhas em Demandas do dia nos dias escolhidos.</span></p>
+      <div class="rec-list" id="rec-list"></div>
     </details>
   </section>
 
