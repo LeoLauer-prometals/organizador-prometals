@@ -603,7 +603,6 @@ function shiftMonth(n){
   S.cal.sel = S.today.startsWith(`${y}-${pad(m+1)}`) ? S.today : `${y}-${pad(m+1)}-01`;
   renderCal();
 }
-$("#day-open-dia").addEventListener("click", () => { S.diaDate = S.cal.sel; render("dia"); activate("dia", false); window.scrollTo({ top: 0 }); });
 $("#cal-add").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $("#cal-add-in"), texto = input.value.replace(/\s+/g, " ").trim();
