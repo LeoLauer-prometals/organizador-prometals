@@ -192,35 +192,40 @@
     <div class="sheet-head">
       <div>
         <h2>Demandas de terceiros</h2>
-        <p>O que seus colegas pediram para você. Arraste um card até Lembretes ou Demandas do dia para encaixar na sua rotina.</p>
+        <p>Peça algo a um colega e acompanhe o que pediram para você.</p>
       </div>
     </div>
+
+    <div class="pedir-box">
+      <h3 class="pedir-title">Pedir para um colega</h3>
+      <form class="add enviar" id="form-enviar" autocomplete="off">
+        <label class="sr" for="para-enviar">Para quem</label>
+        <select class="field a-s" id="para-enviar" required><option value="">Para quem?</option></select>
+        <label class="sr" for="in-enviar">Título da demanda</label>
+        <input class="field a-t" id="in-enviar" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
+        <label class="sr" for="notes-enviar">Detalhes (opcional)</label>
+        <textarea class="field a-n" id="notes-enviar" rows="2" maxlength="20000" placeholder="Detalhes (opcional): valores, contatos, prazo…"></textarea>
+        <div class="prio-pick a-p" role="radiogroup" aria-label="Prioridade" id="prio-enviar"><label data-p="alta"><input type="radio" name="prio-enviar" id="prio-enviar-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-enviar" id="prio-enviar-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-enviar" id="prio-enviar-baixa" value="baixa"><i></i>Baixa</label></div>
+        <button class="btn a-b" type="submit">Enviar</button>
+      </form>
+      <p class="tip" id="tip-enviar">O colega vê o pedido aqui na aba dele e recebe um aviso por e-mail. Você acompanha logo abaixo, em Enviadas por mim.</p>
+    </div>
+
+    <h3 class="secao">Pedidos para mim <small>o que os colegas pediram para você</small></h3>
+    <p class="tip">Arraste um card até Lembretes ou Demandas do dia para encaixar na sua rotina.</p>
     <p class="empty" id="empty-terceiros">Carregando…</p>
     <div class="grid" id="list-terceiros"></div>
     <details class="done" id="done-terceiros" hidden>
-      <summary><span>Concluídas (<span id="done-count-terceiros">0</span>)</span></summary>
+      <summary><span>Concluídas por mim (<span id="done-count-terceiros">0</span>)</span></summary>
       <div class="done-tools"><p>Arquivadas saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="terceiros">Arquivar concluídas</button></div>
       <div class="grid" id="done-list-terceiros"></div>
     </details>
 
-    <h3 class="secao">Pedir para um colega</h3>
-    <form class="add enviar" id="form-enviar" autocomplete="off">
-      <label class="sr" for="para-enviar">Para quem</label>
-      <select class="field a-s" id="para-enviar" required><option value="">Para quem?</option></select>
-      <label class="sr" for="in-enviar">Título da demanda</label>
-      <input class="field a-t" id="in-enviar" placeholder="Título, ex.: Faturar nota do cliente X" maxlength="280">
-      <label class="sr" for="notes-enviar">Detalhes (opcional)</label>
-      <textarea class="field a-n" id="notes-enviar" rows="2" maxlength="20000" placeholder="Detalhes (opcional): valores, contatos, prazo…"></textarea>
-      <div class="prio-pick a-p" role="radiogroup" aria-label="Prioridade" id="prio-enviar"><label data-p="alta"><input type="radio" name="prio-enviar" id="prio-enviar-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-enviar" id="prio-enviar-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-enviar" id="prio-enviar-baixa" value="baixa"><i></i>Baixa</label></div>
-      <button class="btn a-b" type="submit">Enviar</button>
-    </form>
-    <p class="tip" id="tip-enviar">A pessoa vê o pedido na aba Demandas de terceiros dela, e você acompanha aqui quando for concluído.</p>
-
-    <h3 class="secao">Enviadas por mim</h3>
+    <h3 class="secao">Enviadas por mim <small>o que você pediu aos colegas</small></h3>
     <p class="empty" id="empty-enviados">Carregando…</p>
     <div class="grid" id="list-enviados"></div>
     <details class="done" id="done-enviados" hidden>
-      <summary><span>Concluídas (<span id="done-count-enviados">0</span>)</span></summary>
+      <summary><span>Concluídas pelos colegas (<span id="done-count-enviados">0</span>)</span></summary>
       <div class="grid" id="done-list-enviados"></div>
     </details>
   </section>

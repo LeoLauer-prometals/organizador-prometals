@@ -540,3 +540,13 @@ select.field{appearance:auto;padding-right:8px}
 .cal-add select.field{width:auto}
 .cal-add-hint{grid-column:1/-1;margin:0;font-size:12px;color:var(--text-muted)}
 @media (max-width:560px){ .cal-add{grid-template-columns:minmax(0,1fr) auto} #cal-add-in{grid-column:1/-1} }
+/* ── Demandas de terceiros: pedir no topo ── */
+.pedir-box{margin:0 0 8px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--hover-bg)}
+.pedir-title{margin:0 0 12px;color:var(--accent);font:700 14px/1.2 var(--f-display);text-transform:uppercase;letter-spacing:1px}
+.pedir-box .tip{margin:10px 0 0}
+#panel-terceiros .secao + .tip{margin-top:-4px}
+@media (max-width:560px){
+  .add.enviar{grid-template-areas:"s s" "t t" "n n" "p p" "b b"}
+  .add.enviar .prio-pick label{flex:1}
+  .pedir-box{padding:14px 12px}
+}
