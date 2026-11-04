@@ -550,3 +550,38 @@ select.field{appearance:auto;padding-right:8px}
   .add.enviar .prio-pick label{flex:1}
   .pedir-box{padding:14px 12px}
 }
+
+/* ── Horários e agenda da Rotina ── */
+#form-lembretes{grid-template-columns:minmax(0,1fr) auto auto auto auto auto}
+.field[type="time"]{font:500 14px/1 var(--f-mono);color:var(--text-muted);width:auto}
+.cal-add{grid-template-columns:minmax(0,1fr) auto auto auto}
+.agenda{display:grid;border-top:1px solid var(--border);margin-bottom:6px}
+.ag-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;min-height:44px;border-bottom:1px solid var(--border)}
+.ag-hora{display:flex;flex-direction:column;gap:4px;padding-top:13px;font:700 14px/1 var(--f-display);color:var(--text-muted);font-variant-numeric:tabular-nums}
+.ag-hora small{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+.ag-row.is-now{background:linear-gradient(90deg,rgba(240,122,31,.10),transparent 70%)}
+.ag-row.is-now .ag-hora{color:var(--accent)}
+.ag-row.is-past .ag-hora{opacity:.55}
+.ag-slot{min-width:0;padding:6px 0}
+.ag-slot .rot-list{gap:6px}
+.rot-item.sem-num{grid-template-columns:auto minmax(0,1fr)}
+.rot-item.is-done{opacity:.7}
+.rot-item.is-done .rot-text{text-decoration:line-through;color:var(--text-muted)}
+.rot-sec{margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border);color:var(--text);font:700 15px/1.2 var(--f-display)}
+.rot-sec small{margin-left:8px;color:var(--text-muted);font-weight:400;font-size:12px}
+.rot-agenda-vazia{margin:0 0 18px;padding:12px 14px;border:1px dashed var(--input-border);border-radius:10px;color:var(--text-muted);font-size:13px}
+#rot-agenda + #rot-groups .rot-group:first-child{margin-top:0}
+@media (max-width:560px){
+  .ag-row{grid-template-columns:50px minmax(0,1fr);gap:8px}
+  .cal-add{grid-template-columns:minmax(0,1fr) auto auto}
+  #form-lembretes .field[type="time"],#form-lembretes .field[type="date"]{width:100%}
+}
+/* Formulário de Lembretes em duas linhas */
+#form-lembretes{grid-template-columns:minmax(0,1fr) auto auto auto;grid-template-areas:"t t t r" "p d h b"}
+#in-lembretes{grid-area:t} #rep-dia{grid-area:r;max-width:none;width:100%} #prio-lembretes{grid-area:p;justify-self:start}
+#date-lembretes{grid-area:d} #hora-lembretes{grid-area:h} #form-lembretes .btn{grid-area:b}
+@media (max-width:560px){
+  #form-lembretes{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"t t" "r r" "p p" "d h" "b b"}
+  #prio-lembretes{justify-self:stretch}
+  #form-lembretes #in-lembretes{grid-area:t} #form-lembretes #rep-dia{grid-area:r}
+}

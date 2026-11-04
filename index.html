@@ -103,8 +103,9 @@
       </div>
       <span class="progress" id="rot-summary"></span>
     </div>
-    <p class="tip">A ordem leva em conta a prioridade, os prazos (atrasados e que vencem hoje) e há quanto tempo cada demanda está esperando. Marque como feito aqui mesmo e a lista se reorganiza.</p>
+    <p class="tip">A agenda mostra o que tem horário hoje, e você recebe um e-mail na hora marcada. Abaixo, o que não tem horário vem na ordem sugerida, pela prioridade, pelos prazos e por há quanto tempo está esperando.</p>
     <p class="empty" id="empty-rotina">Carregando…</p>
+    <div id="rot-agenda"></div>
     <div id="rot-groups"></div>
   </section>
 
@@ -130,6 +131,8 @@
       <div class="prio-pick" role="radiogroup" aria-label="Prioridade" id="prio-lembretes"><label data-p="alta"><input type="radio" name="prio-lembretes" id="prio-lembretes-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="prio-lembretes" id="prio-lembretes-media" value="media" checked><i></i>Média</label><label data-p="baixa"><input type="radio" name="prio-lembretes" id="prio-lembretes-baixa" value="baixa"><i></i>Baixa</label></div>
       <label class="sr" for="date-lembretes">Data (opcional)</label>
       <input class="field" type="date" id="date-lembretes">
+      <label class="sr" for="hora-lembretes">Horário (opcional)</label>
+      <input class="field" type="time" id="hora-lembretes" title="Horário (opcional)">
       <button class="btn" type="submit">Criar card</button>
       <div class="rep-extra" id="rep-extra" hidden>
         <div class="rep-dias" id="rep-dias" role="group" aria-label="Dias da semana" hidden>
@@ -265,6 +268,8 @@
         <form class="cal-add" id="cal-add" autocomplete="off" hidden>
           <label class="sr" for="cal-add-in">Adicionar neste dia</label>
           <input class="field" id="cal-add-in" maxlength="280" placeholder="Marcar neste dia, ex.: Reunião com o cliente X">
+          <label class="sr" for="cal-add-hora">Horário (opcional)</label>
+          <input class="field" type="time" id="cal-add-hora" title="Horário (opcional)">
           <label class="sr" for="cal-add-prio">Prioridade</label>
           <select class="field" id="cal-add-prio"><option value="alta">Alta</option><option value="media" selected>Média</option><option value="baixa">Baixa</option></select>
           <button class="btn" type="submit">Marcar</button>
@@ -301,6 +306,7 @@
         <span class="ed-check"><button class="check" type="button" id="ed-check" role="checkbox" aria-checked="false" aria-labelledby="ed-check-label"><svg viewBox="0 0 16 16" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></button><span id="ed-check-label">Pendente</span></span>
         <div class="prio-pick small" role="radiogroup" aria-label="Prioridade" id="ed-prio"><label data-p="alta"><input type="radio" name="ed-prio" id="ed-prio-alta" value="alta"><i></i>Alta</label><label data-p="media"><input type="radio" name="ed-prio" id="ed-prio-media" value="media"><i></i>Média</label><label data-p="baixa"><input type="radio" name="ed-prio" id="ed-prio-baixa" value="baixa"><i></i>Baixa</label></div>
         <label class="ed-date" id="ed-date-wrap">Data <input class="field" type="date" id="ed-date"></label>
+        <label class="ed-date" id="ed-hora-wrap">Hora <input class="field" type="time" id="ed-hora"></label>
         <span class="ed-author" id="ed-author"></span>
       </div>
       <span class="ed-notes-label" id="ed-notes-label">Anotações</span>

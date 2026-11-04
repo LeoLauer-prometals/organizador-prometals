@@ -52,6 +52,9 @@ function when(ts){
 function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 function longDay(iso){ return cap(parseDay(iso).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })); }
 function setToday(){ $("#today").textContent = cap(new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })); }
+const fmtHora = (h) => h ? String(h).slice(0, 5).replace(":", "h") : "";
+const lerHora = (el) => /^\d\d:\d\d/.test(el.value || "") ? el.value.slice(0, 5) : null;
+const horaAgora = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const isDay = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /* ---------- Supabase ---------- */
@@ -75,7 +78,8 @@ function rowToCard(r){
   return { tab: r.aba, id: r.id, key: `${r.aba}|${r.id}`, texto: r.texto || "", notas: r.notas || "",
     quando: r.quando || null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
     criadoEm: r.criado_em || null, arquivado: !!r.arquivado, pedido: r.pedido || null,
-    anexos: Array.isArray(r.anexos) ? r.anexos : [], recorrencia: r.recorrencia || null };
+    anexos: Array.isArray(r.anexos) ? r.anexos : [], recorrencia: r.recorrencia || null,
+    hora: r.hora ? String(r.hora).slice(0, 5) : null };
 }
 function rowToPedido(r, tab){
   return { tab, id: r.id, key: `${tab}|${r.id}`, de: r.de, para: r.para, texto: r.texto || "", notas: r.notas || "",
@@ -94,7 +98,7 @@ function toRow(patch, pedido){
 }
 function cardRow(i){
   return { id: i.id, aba: i.tab, texto: i.texto, notas: i.notas || "", quando: i.quando, prioridade: i.prioridade,
-    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm, anexos: i.anexos || [], recorrencia: i.recorrencia || null };
+    feito: i.feito, feito_em: i.feitoEm, arquivado: !!i.arquivado, pedido: i.pedido, criado_em: i.criadoEm, anexos: i.anexos || [], recorrencia: i.recorrencia || null, hora: i.hora || null };
 }
 
 async function loadPerfis(){
@@ -123,7 +127,7 @@ async function loadRecorrencias(){
   if (error){ S.recs = []; S.recsOff = true; return; }
   S.recsOff = false;
   S.recs = data.map(r => ({ id: r.id, texto: r.texto, notas: r.notas || "", prioridade: prioOf(r.prioridade), frequencia: r.frequencia,
-    dias: Array.isArray(r.dias_semana) ? r.dias_semana : [], diaMes: r.dia_mes || null, inicio: r.inicio, fim: r.fim || null, ultima: r.ultima_gerada || null }));
+    dias: Array.isArray(r.dias_semana) ? r.dias_semana : [], diaMes: r.dia_mes || null, inicio: r.inicio, fim: r.fim || null, ultima: r.ultima_gerada || null, hora: r.hora ? String(r.hora).slice(0, 5) : null }));
 }
 function ocorreEm(rec, iso){
   if (iso < rec.inicio || (rec.fim && iso > rec.fim)) return false;
@@ -144,7 +148,7 @@ function descRec(rec){
     : rec.frequencia === "semanal" ? "Toda " + listaPt([...rec.dias].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DIAS_NOME[d]))
     : `Todo dia ${rec.diaMes} do mês`;
   const per = rec.fim ? `de ${fmtShort(rec.inicio)} a ${fmtShort(rec.fim)}` : rec.inicio > S.today ? `a partir de ${fmtShort(rec.inicio)}` : "sem data para acabar";
-  return `${f} · ${per}`;
+  return `${f}${rec.hora ? " às " + fmtHora(rec.hora) : ""} · ${per}`;
 }
 const recAtiva = (rec) => !rec.fim || rec.fim >= S.today;
 // Cria o card de hoje de cada recorrência (uma vez por dia; excluir o card não faz ele voltar).
@@ -155,7 +159,7 @@ async function gerarRecorrencias(){
   if (!pend.length) return false;
   pend.forEach(r => tentouGerar.add(r.id + T));
   try {
-    const rows = pend.map(r => ({ aba: "dia", texto: r.texto, notas: r.notas, prioridade: r.prioridade, quando: T, recorrencia: r.id }));
+    const rows = pend.map(r => ({ aba: "dia", texto: r.texto, notas: r.notas, prioridade: r.prioridade, quando: T, hora: r.hora, recorrencia: r.id }));
     await q(sb.from("cards").upsert(rows, { onConflict: "recorrencia,quando", ignoreDuplicates: true }));
     await q(sb.from("recorrencias").update({ ultima_gerada: T }).in("id", pend.map(r => r.id)));
     pend.forEach(r => { r.ultima = T; });
@@ -290,6 +294,10 @@ function pedidoOf(c){ return c.pedido ? (S.data.terceiros || []).find(p => p.id 
 function chipsSimple(i){
   const c = [];
   if (i.pedido) c.push({ text: "de terceiros", kind: "from" });
+  if (i.hora){
+    const passou = !i.feito && i.quando && (i.quando < S.today || (i.quando === S.today && i.hora <= horaAgora()));
+    c.push({ text: fmtHora(i.hora), kind: passou ? "late" : "soon" });
+  }
   const rc = recDe(i);
   if (i.recorrencia) c.push({ text: rc ? "repete: " + descRec(rc).split(" · ")[0].toLowerCase() : "recorrente" });
   else if (i.quando) c.push(dueChip(i.quando, i.feito));
@@ -561,7 +569,7 @@ function renderCal(){
   $("#day-done-wrap").hidden = !other.length;
   $("#day-done").replaceChildren(...other.map(e => miniRow(e.item, hm(e.item.feitoEm))));
   $("#day-due-wrap").hidden = !du.length;
-  $("#day-due").replaceChildren(...du.sort((a, b) => byPrio(a.item, b.item)).map(e => miniRow(e.item, e.item.tab === "lembretes" ? "lembrete" : "do dia", true)));
+  $("#day-due").replaceChildren(...du.sort((a, b) => byPrio(a.item, b.item)).map(e => miniRow(e.item, e.item.hora ? fmtHora(e.item.hora) : e.item.tab === "lembretes" ? "lembrete" : "do dia", true)));
   // Recorrentes previstas para hoje e dias futuros (dias passados já aparecem no fechamento).
   const geradas = new Set((S.data.dia || []).concat(S.data.lembretes || []).filter(c => c.recorrencia && c.quando === sel).map(c => c.recorrencia));
   const recs = sel >= S.today ? S.recs.filter(r => ocorreEm(r, sel) && !geradas.has(r.id)) : [];
@@ -607,13 +615,13 @@ $("#cal-add").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $("#cal-add-in"), texto = input.value.replace(/\s+/g, " ").trim();
   if (!texto){ input.focus(); return; }
-  const quando = S.cal.sel, prioridade = prioOf($("#cal-add-prio").value);
+  const quando = S.cal.sel, prioridade = prioOf($("#cal-add-prio").value), hora = lerHora($("#cal-add-hora"));
   if (quando < S.today) return;
   input.value = "";
   const ok = await write(() => q(sb.from("cards").insert(quando === S.today
-    ? { aba: "dia", texto, quando, prioridade }
-    : { aba: "lembretes", texto, quando, prioridade })));
-  if (ok){ $("#cal-add-prio").value = "media"; toast(quando === S.today ? "Adicionado às Demandas do dia de hoje." : `Marcado para ${fmtShort(quando)}.`); }
+    ? { aba: "dia", texto, quando, hora, prioridade }
+    : { aba: "lembretes", texto, quando, hora, prioridade })));
+  if (ok){ $("#cal-add-prio").value = "media"; $("#cal-add-hora").value = ""; toast(quando === S.today ? "Adicionado às Demandas do dia de hoje." : `Marcado para ${fmtShort(quando)}.`); }
   else input.value = texto;
   input.focus();
 });
@@ -629,7 +637,9 @@ function rotinaItens(){
   const add = (i, origem) => {
     let score = { alta: 400, media: 200, baixa: 0 }[i.prioridade];
     const motivos = [];
-    if (i.quando && !i.recorrencia){
+    if (i.hora && i.quando === T){
+      motivos.push({ text: fmtHora(i.hora), kind: i.hora <= horaAgora() ? "late" : "soon" });
+    } else if (i.quando && !i.recorrencia){
       const d = daysBetween(T, i.quando);
       if (d < 0){ score += 200 + 10 * Math.min(-d, 30); motivos.push({ text: `atrasado ${-d} ${-d === 1 ? "dia" : "dias"}`, kind: "late" }); }
       else if (d === 0){ score += 150; motivos.push({ text: "vence hoje", kind: "soon" }); }
@@ -654,42 +664,78 @@ function rotinaItens(){
   return out.sort((a, b) => b.score - a.score || byCreated(a.item, b.item));
 }
 function renderRotina(){
-  const wrap = $("#rot-groups"), empty = $("#empty-rotina");
+  const wrap = $("#rot-groups"), agenda = $("#rot-agenda"), empty = $("#empty-rotina");
   if (S.data.dia === null || S.data.lembretes === null || S.data.terceiros === null){
-    wrap.replaceChildren(); empty.hidden = false; empty.textContent = "Carregando…"; $("#count-rotina").textContent = "–"; return;
+    wrap.replaceChildren(); agenda.replaceChildren(); empty.hidden = false; empty.textContent = "Carregando…"; $("#count-rotina").textContent = "–"; return;
   }
+  const T = S.today;
   const itens = rotinaItens();
   $("#count-rotina").textContent = itens.length;
   markAlta("rotina", itens.map(x => x.item));
-  const feitasHoje = [...S.data.dia, ...S.data.lembretes, ...S.data.terceiros].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === S.today).length;
+  const feitasHoje = [...S.data.dia, ...S.data.lembretes, ...S.data.terceiros].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
   $("#rot-summary").textContent = feitasHoje ? `${feitasHoje} ${feitasHoje === 1 ? "feita" : "feitas"} hoje` : "";
-  empty.hidden = itens.length > 0;
+  const comHora = itens.filter(x => x.item.hora && x.item.quando === T);
+  const semHora = itens.filter(x => !(x.item.hora && x.item.quando === T));
+  const feitosComHora = [...S.data.dia, ...S.data.lembretes].filter(i => i.feito && i.hora && i.quando === T)
+    .map(i => ({ item: i, motivos: [{ text: fmtHora(i.hora) }] }));
+  empty.hidden = itens.length > 0 || feitosComHora.length > 0;
   empty.textContent = "Nada pendente agora. Quando você criar demandas ou um colega pedir algo, a rotina se monta aqui.";
-  const grupos = [["Comece por aqui", itens.slice(0, 3)], ["Em seguida", itens.slice(3, 8)], ["Se sobrar tempo", itens.slice(8)]];
+  renderAgenda(comHora.concat(feitosComHora));
+
+  const grupos = [["Comece por aqui", semHora.slice(0, 3)], ["Em seguida", semHora.slice(3, 8)], ["Se sobrar tempo", semHora.slice(8)]];
   let n = 0;
-  wrap.replaceChildren(...grupos.filter(g => g[1].length).map(([titulo, lista]) => {
+  const blocos = grupos.filter(g => g[1].length).map(([titulo, lista]) => {
     const g = el("div", "rot-group");
     g.append(el("h3", "rot-title", titulo));
     const ol = el("ol", "rot-list"); ol.start = n + 1;
     for (const x of lista){ n++; ol.append(rotItem(x, n)); }
     g.append(ol);
     return g;
-  }));
+  });
+  if (blocos.length && (comHora.length || feitosComHora.length)){
+    const h = el("h3", "rot-sec", "Sem horário"); h.append(el("small", null, "na ordem sugerida"));
+    blocos.unshift(h);
+  }
+  wrap.replaceChildren(...blocos);
+}
+function renderAgenda(lista){
+  const box = $("#rot-agenda");
+  if (!lista.length){
+    box.replaceChildren(el("p", "rot-agenda-vazia", "Coloque um horário num lembrete, num card ou pelo calendário para montar a agenda do dia aqui."));
+    return;
+  }
+  const hr = (x) => parseInt(x.item.hora.slice(0, 2), 10);
+  const ini = Math.min(8, ...lista.map(hr)), fim = Math.max(18, ...lista.map(hr));
+  const agoraH = new Date().getHours();
+  const grade = el("div", "agenda");
+  for (let h = ini; h <= fim; h++){
+    const row = el("div", "ag-row" + (h === agoraH ? " is-now" : "") + (h < agoraH ? " is-past" : ""));
+    const lab = el("span", "ag-hora", pad(h) + "h00");
+    if (h === agoraH) lab.append(el("small", null, "agora"));
+    const slot = el("div", "ag-slot");
+    const daHora = lista.filter(x => hr(x) === h).sort((a, b) => a.item.hora.localeCompare(b.item.hora));
+    if (daHora.length){ const ul = el("ul", "rot-list"); daHora.forEach(x => ul.append(rotItem(x, null))); slot.append(ul); }
+    row.append(lab, slot);
+    grade.append(row);
+  }
+  box.replaceChildren(el("h3", "rot-title", "Agenda de hoje"), grade);
 }
 function rotItem(x, n){
   const i = x.item;
-  const li = el("li", "rot-item" + (i.prioridade === "alta" ? " is-alta" : ""));
+  const li = el("li", "rot-item" + (i.prioridade === "alta" && !i.feito ? " is-alta" : "") + (n == null ? " sem-num" : "") + (i.feito ? " is-done" : ""));
   li.dataset.tab = i.tab;
   const body = el("button", "rot-body"); body.type = "button";
   body.append(el("span", "rot-text", i.texto || "Sem título"));
   const meta = el("span", "rot-meta");
   const src = el("span", "rot-src"); src.append(el("span", "tab-mark"), el("span", null, NOMES[i.tab]));
-  meta.append(prioEl(i.prioridade), src);
+  if (!i.feito) meta.append(prioEl(i.prioridade));
+  meta.append(src);
   x.motivos.forEach(m => meta.append(chipEl(m)));
   body.append(meta);
   if (plainText(i.notas).trim()) body.append(el("span", "rot-notes", plainText(i.notas).trim().split("\n")[0]));
   body.addEventListener("click", () => openEditor(i.key));
-  li.append(el("span", "rot-num", String(n)), checkBtn(i, true), body);
+  if (n != null) li.append(el("span", "rot-num", String(n)));
+  li.append(checkBtn(i, true), body);
   return li;
 }
 
@@ -847,6 +893,7 @@ function openEditor(key){
   hint.textContent = i.tab === "terceiros" ? `${nomeDe(i.de)} também vê estas anotações. Só quem pediu muda o título.`
     : i.tab === "enviados" ? `${nomeDe(i.para)} também vê e pode anotar aqui.` : "";
   $("#ed-date-wrap").hidden = isPedidoTab(i.tab);
+  $("#ed-hora-wrap").hidden = isPedidoTab(i.tab);
   const del = $("#ed-delete");
   del.textContent = i.tab === "terceiros" ? "Remover da minha lista" : i.tab === "enviados" ? "Excluir pedido" : "Excluir card";
   setEdSaved("");
@@ -865,6 +912,7 @@ function refreshEditorMeta(){
   ED.check.disabled = !canToggle(i);
   $("#ed-check-label").textContent = i.feito ? (i.feitoEm ? "Feito " + when(i.feitoEm) : "Feito") : "Pendente";
   if (!isPedidoTab(i.tab) && document.activeElement !== ED.date) ED.date.value = i.quando || "";
+  if (!isPedidoTab(i.tab) && document.activeElement !== $("#ed-hora")) $("#ed-hora").value = i.hora || "";
   $("#ed-prio-" + i.prioridade).checked = true;
   const a = $("#ed-author"); a.replaceChildren();
   if (i.tab === "terceiros"){ a.append(whoEl(i.de, "pedido por")); if (i.criadoEm) a.append(chipEl({ text: when(i.criadoEm) })); }
@@ -1112,6 +1160,13 @@ ED.notes.addEventListener("paste", (e) => {
   const limpo = html ? sanitize(html.replace(/<!--[\s\S]*?-->/g, "")) : esc(cd.getData("text/plain")).replace(/\r?\n/g, "<br>");
   document.execCommand("insertHTML", false, limpo);
 });
+$("#ed-hora").addEventListener("change", () => {
+  const ed = S.ed; if (!ed) return;
+  const hora = lerHora($("#ed-hora"));
+  const patch = { hora };
+  if (hora && !ed.item.quando){ patch.quando = S.today; ED.date.value = S.today; }
+  write(() => patchItem(ed.item, patch));
+});
 ED.date.addEventListener("change", () => {
   const ed = S.ed; if (!ed) return;
   write(() => patchItem(ed.item, { quando: isDay(ED.date.value) ? ED.date.value : null }));
@@ -1279,7 +1334,7 @@ async function pararRecorrencia(r){
     ? await write(() => q(sb.from("recorrencias").delete().eq("id", r.id)))
     : await write(() => q(sb.from("recorrencias").update({ fim: ontem }).eq("id", r.id)));
   if (!ok) return;
-  const row = { id: r.id, texto: r.texto, notas: r.notas, prioridade: r.prioridade, frequencia: r.frequencia, dias_semana: r.dias, dia_mes: r.diaMes, inicio: r.inicio, fim: r.fim, ultima_gerada: r.ultima };
+  const row = { id: r.id, texto: r.texto, notas: r.notas, prioridade: r.prioridade, frequencia: r.frequencia, dias_semana: r.dias, dia_mes: r.diaMes, inicio: r.inicio, fim: r.fim, ultima_gerada: r.ultima, hora: r.hora };
   toast(`"${r.texto}" não vai mais se repetir. O card de hoje, se já existir, continua na lista.`, { label: "Desfazer", run: () =>
     write(() => r.ultima ? q(sb.from("recorrencias").update({ fim: antes }).eq("id", r.id)) : q(sb.from("recorrencias").insert(row))) });
 }
@@ -1307,21 +1362,23 @@ bindForm("#form-dia", "#in-dia", () => {
 bindForm("#form-lembretes", "#in-lembretes", () => {
   const prioridade = readPrio("lembretes"), rep = $("#rep-dia").value;
   if (rep === "nao"){
-    const dateEl = $("#date-lembretes"), quando = isDay(dateEl.value) ? dateEl.value : null;
-    return { save: (texto) => q(sb.from("cards").insert({ aba: "lembretes", texto, quando, prioridade })),
-      after: () => { dateEl.value = ""; resetPrio("lembretes"); } };
+    const dateEl = $("#date-lembretes"), horaEl = $("#hora-lembretes"), hora = lerHora(horaEl);
+    const quando = isDay(dateEl.value) ? dateEl.value : (hora ? S.today : null);
+    return { save: (texto) => q(sb.from("cards").insert({ aba: "lembretes", texto, quando, hora, prioridade })),
+      after: () => { dateEl.value = ""; horaEl.value = ""; resetPrio("lembretes"); } };
   }
   if (S.recsOff){ toast("As demandas recorrentes ainda não foram ativadas no Supabase. Rode o arquivo atualizacao-2-recorrentes.sql (veja o README)."); return null; }
   const inicio = isDay($("#rep-inicio").value) ? $("#rep-inicio").value : S.today;
+  const hora = lerHora($("#hora-lembretes"));
   const fim = isDay($("#rep-fim").value) ? $("#rep-fim").value : null;
   const dias = [...document.querySelectorAll("#rep-dias input:checked")].map(c => Number(c.value));
   const diaMes = Math.min(31, Math.max(1, parseInt($("#rep-mes").value, 10) || parseDay(inicio).getDate()));
   if (fim && fim < inicio){ toast("A data final precisa ser depois da data de início."); return null; }
   if (rep === "semanal" && !dias.length){ toast("Escolha pelo menos um dia da semana."); return null; }
   return {
-    save: (texto) => q(sb.from("recorrencias").insert({ texto, prioridade, frequencia: rep, dias_semana: rep === "semanal" ? dias : [], dia_mes: rep === "mensal" ? diaMes : null, inicio, fim })),
+    save: (texto) => q(sb.from("recorrencias").insert({ texto, prioridade, frequencia: rep, dias_semana: rep === "semanal" ? dias : [], dia_mes: rep === "mensal" ? diaMes : null, inicio, fim, hora })),
     after: async () => {
-      resetPrio("lembretes"); resetRep(); $("#date-lembretes").value = "";
+      resetPrio("lembretes"); resetRep(); $("#date-lembretes").value = ""; $("#hora-lembretes").value = "";
       await loadRecorrencias(); await gerarRecorrencias(); renderAll();
       toast("Lembrete recorrente criado. Ele aparece sozinho em Demandas do dia nos dias escolhidos.");
     }
@@ -1507,6 +1564,7 @@ function boot(){
 
 setInterval(() => {
   const t = localISO();
+  if (S.me && S.active === "rotina" && !S.ed && !S.drag) renderRotina();
   if (t !== S.today){ if (S.diaDate === S.today) S.diaDate = t; S.today = t; setToday(); renderAll(); if (S.me) scheduleReload(); }
 }, 60000);
 
