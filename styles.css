@@ -585,3 +585,17 @@ select.field{appearance:auto;padding-right:8px}
   #prio-lembretes{justify-self:stretch}
   #form-lembretes #in-lembretes{grid-area:t} #form-lembretes #rep-dia{grid-area:r}
 }
+/* Horário em Demandas do dia */
+#form-dia{grid-template-columns:minmax(0,1fr) auto auto auto}
+@media (max-width:560px){
+  #form-dia{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t t" "p p" "h b"}
+  #in-dia{grid-area:t} #prio-dia{grid-area:p} #hora-dia{grid-area:h;width:100%} #form-dia .btn{grid-area:b}
+  #prio-dia label{flex:1}
+}
+/* Prazo nos pedidos */
+.add.enviar{grid-template-columns:minmax(0,240px) minmax(0,1fr) auto auto auto;grid-template-areas:"s t t t t" "n n n n n" "p . d h b"}
+.add.enviar .a-d{grid-area:d} .add.enviar .a-h{grid-area:h}
+@media (max-width:560px){
+  .add.enviar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"s s" "t t" "n n" "p p" "d h" "b b"}
+  .add.enviar .a-d,.add.enviar .a-h{width:100%}
+}

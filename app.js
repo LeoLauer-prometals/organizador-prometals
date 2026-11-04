@@ -83,7 +83,7 @@ function rowToCard(r){
 }
 function rowToPedido(r, tab){
   return { tab, id: r.id, key: `${tab}|${r.id}`, de: r.de, para: r.para, texto: r.texto || "", notas: r.notas || "",
-    quando: null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
+    quando: r.quando || null, hora: r.hora ? String(r.hora).slice(0, 5) : null, prioridade: prioOf(r.prioridade), feito: !!r.feito, feitoEm: r.feito_em || null,
     criadoEm: r.criado_em || null, arquivado: !!r.arquivado_para, anexos: Array.isArray(r.anexos) ? r.anexos : [] };
 }
 const COLS = { texto: "texto", notas: "notas", quando: "quando", prioridade: "prioridade", feito: "feito",
@@ -311,6 +311,11 @@ function chipsSimple(i){
 }
 function chipsPedido(i){
   const c = [];
+  if (i.quando && !i.feito){
+    const passou = i.quando < S.today || (i.quando === S.today && i.hora && i.hora <= horaAgora());
+    const dt = i.quando === S.today ? "hoje" : i.quando === (() => { const d = parseDay(S.today); d.setDate(d.getDate() + 1); return localISO(d); })() ? "amanhã" : fmtShort(i.quando);
+    c.push({ text: `prazo ${dt}${i.hora ? " · " + fmtHora(i.hora) : ""}`, kind: passou ? "late" : "soon" });
+  }
   if (i.criadoEm) c.push({ text: when(i.criadoEm) });
   if (i.tab === "terceiros" && !i.feito){ const cp = copiesOf(i)[0]; if (cp) c.push({ text: cp.tab === "dia" ? "na lista do dia" : "nos lembretes", kind: "from" }); }
   if (i.feito && i.feitoEm) c.push({ text: (i.tab === "enviados" ? "concluída " : "feito ") + when(i.feitoEm) });
@@ -430,7 +435,7 @@ function renderDia(){
   renderDiaNav();
   if (data === null){ $("#progress-dia").textContent = ""; $("#dia-note").hidden = true; return waitingPanel("dia"); }
   const D = S.diaDate, T = S.today;
-  const sortP = (a, b) => byPrio(a, b) || byCreated(a, b);
+  const sortP = (a, b) => byPrio(a, b) || (a.hora || "99").localeCompare(b.hora || "99") || byCreated(a, b);
   const todayPend = data.filter(i => !i.feito && (!i.quando || i.quando <= T) && !vencidoRec(i, T)).sort(sortP);
   markAlta("dia", todayPend);
   let pend, done, empty, noteText = "";
@@ -503,6 +508,7 @@ function doneEntries(){
 function dueEntries(){
   const out = [];
   for (const tab of ["lembretes", "dia"]) for (const i of S.data[tab] || []) if (!i.feito && i.quando && !i.recorrencia) out.push({ item: i, day: i.quando });
+  for (const i of S.data.terceiros || []) if (!i.feito && i.quando && !copiesOf(i).length) out.push({ item: i, day: i.quando });
   return out;
 }
 function groupBy(list){ const g = {}; for (const e of list) (g[e.day] = g[e.day] || []).push(e); return g; }
@@ -798,7 +804,7 @@ async function moveSimple(i, dest){
   if (await move(dest)) toast(`Movido para ${NOMES[dest]}.`, { label: "Desfazer", run: () => move(src) });
 }
 async function copyPedido(p, dest){
-  const ok = await write(() => q(sb.from("cards").insert({ aba: dest, texto: p.texto, notas: p.notas || "", prioridade: p.prioridade, pedido: p.id, anexos: p.anexos || [] })));
+  const ok = await write(() => q(sb.from("cards").insert({ aba: dest, texto: p.texto, notas: p.notas || "", prioridade: p.prioridade, pedido: p.id, anexos: p.anexos || [], quando: p.quando || null, hora: p.hora || null })));
   if (ok) toast(`Levado para ${NOMES[dest]}.`, { label: "Ver", run: () => activate(dest, false) });
 }
 function dropOn(i, dest){ if (i.tab === "terceiros") copyPedido(i, dest); else moveSimple(i, dest); }
@@ -892,8 +898,8 @@ function openEditor(key){
   hint.hidden = !isPedidoTab(i.tab);
   hint.textContent = i.tab === "terceiros" ? `${nomeDe(i.de)} também vê estas anotações. Só quem pediu muda o título.`
     : i.tab === "enviados" ? `${nomeDe(i.para)} também vê e pode anotar aqui.` : "";
-  $("#ed-date-wrap").hidden = isPedidoTab(i.tab);
-  $("#ed-hora-wrap").hidden = isPedidoTab(i.tab);
+  $("#ed-date-wrap").hidden = false;
+  $("#ed-hora-wrap").hidden = false;
   const del = $("#ed-delete");
   del.textContent = i.tab === "terceiros" ? "Remover da minha lista" : i.tab === "enviados" ? "Excluir pedido" : "Excluir card";
   setEdSaved("");
@@ -911,8 +917,8 @@ function refreshEditorMeta(){
   ED.check.setAttribute("aria-checked", String(i.feito));
   ED.check.disabled = !canToggle(i);
   $("#ed-check-label").textContent = i.feito ? (i.feitoEm ? "Feito " + when(i.feitoEm) : "Feito") : "Pendente";
-  if (!isPedidoTab(i.tab) && document.activeElement !== ED.date) ED.date.value = i.quando || "";
-  if (!isPedidoTab(i.tab) && document.activeElement !== $("#ed-hora")) $("#ed-hora").value = i.hora || "";
+  if (document.activeElement !== ED.date) ED.date.value = i.quando || "";
+  if (document.activeElement !== $("#ed-hora")) $("#ed-hora").value = i.hora || "";
   $("#ed-prio-" + i.prioridade).checked = true;
   const a = $("#ed-author"); a.replaceChildren();
   if (i.tab === "terceiros"){ a.append(whoEl(i.de, "pedido por")); if (i.criadoEm) a.append(chipEl({ text: when(i.criadoEm) })); }
@@ -1356,8 +1362,9 @@ function resetRep(){
   syncRepUI();
 }
 bindForm("#form-dia", "#in-dia", () => {
-  const prioridade = readPrio("dia"), quando = S.diaDate > S.today ? S.diaDate : null;
-  return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, prioridade })), after: () => resetPrio("dia") };
+  const horaEl = $("#hora-dia"), hora = lerHora(horaEl);
+  const prioridade = readPrio("dia"), quando = S.diaDate > S.today ? S.diaDate : (hora ? S.today : null);
+  return { save: (texto) => q(sb.from("cards").insert({ aba: "dia", texto, quando, hora, prioridade })), after: () => { resetPrio("dia"); horaEl.value = ""; } };
 });
 bindForm("#form-lembretes", "#in-lembretes", () => {
   const prioridade = readPrio("lembretes"), rep = $("#rep-dia").value;
@@ -1388,10 +1395,12 @@ bindForm("#form-enviar", "#in-enviar", () => {
   const sel = $("#para-enviar"), para = sel.value;
   if (!para){ toast("Escolha para quem é a demanda."); sel.focus(); return null; }
   const notesEl = $("#notes-enviar"), notas = notesEl.value.slice(0, 20000), prioridade = readPrio("enviar");
+  const dateEl = $("#date-enviar"), horaEl = $("#hora-enviar"), hora = lerHora(horaEl);
+  const quando = isDay(dateEl.value) ? dateEl.value : (hora ? S.today : null);
   notesEl.value = "";
   return {
-    save: (texto) => q(sb.from("pedidos").insert({ para, texto, notas, prioridade })),
-    after: () => { resetPrio("enviar"); toast(`Demanda enviada para ${nomeDe(para)}.`); },
+    save: (texto) => q(sb.from("pedidos").insert(quando || hora ? { para, texto, notas, prioridade, quando, hora } : { para, texto, notas, prioridade })),
+    after: () => { resetPrio("enviar"); dateEl.value = ""; horaEl.value = ""; toast(`Demanda enviada para ${nomeDe(para)}.`); },
     restore: () => { if (!notesEl.value) notesEl.value = notas; }
   };
 });
