@@ -19,7 +19,8 @@ const SEMANA = ["dom","seg","ter","qua","qui","sex","sáb"];
 
 const CFG = window.ORGANIZADOR_CONFIG || {};
 const html = document.documentElement;
-const $ = (s) => document.querySelector(s);
+// Se faltar algum elemento (ex.: index.html de outra versão), usa um "elemento vazio" em vez de travar a página.
+const $ = (s) => document.querySelector(s) || document.createElement("div");
 const now0 = new Date();
 
 const S = {
