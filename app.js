@@ -300,7 +300,7 @@ function chipsSimple(i){
   }
   const rc = recDe(i);
   if (i.recorrencia) c.push({ text: rc ? "repete: " + descRec(rc).split(" · ")[0].toLowerCase() : "recorrente" });
-  else if (i.quando) c.push(dueChip(i.quando, i.feito));
+  else if (i.quando && !(i.hora && i.quando === S.today)) c.push(dueChip(i.quando, i.feito));
   if (i.tab === "dia" && !i.feito && i.criadoEm && !i.quando){
     const iso = dayOf(i.criadoEm), diff = daysBetween(iso, S.today);
     if (diff === 1) c.push({ text: "desde ontem", kind: "soon" });
@@ -358,7 +358,7 @@ function cardEl(i){
     top.append(g);
   }
   const pt = plainText(i.notas).trim(), hasNotes = !!pt;
-  art.append(open, top, el("p", "card-notes" + (hasNotes ? "" : " is-empty"), hasNotes ? pt : "Sem anotações. Clique para escrever."));
+  art.append(open, top, el("p", "card-notes" + (hasNotes ? "" : " is-empty"), hasNotes ? pt : "Sem anotações."));
 
   const isP = isPedidoTab(i.tab);
   const chips = isP ? chipsPedido(i) : chipsSimple(i);
@@ -414,8 +414,6 @@ function renderDiaNav(){
 }
 function setDiaDate(iso){ S.diaDate = iso; render("dia"); }
 function shiftDia(n){ const d = parseDay(S.diaDate); d.setDate(d.getDate() + n); setDiaDate(localISO(d)); }
-$("#dia-prev").addEventListener("click", () => shiftDia(-1));
-$("#dia-next").addEventListener("click", () => shiftDia(1));
 $("#dia-hoje").addEventListener("click", () => setDiaDate(S.today));
 
 function closingOf(iso){
@@ -471,7 +469,7 @@ function renderDia(){
   fillPanel("dia", pend.map(cardEl), done.map(cardEl), empty);
   $("#count-dia").textContent = todayPend.length;
   const note = $("#dia-note"); note.hidden = !noteText; note.textContent = noteText;
-  $("#form-dia").hidden = D < T; $("#tip-dia").hidden = D < T;
+  $("#form-dia").hidden = D !== T;
   $("#tools-dia").hidden = D !== T;
   $("#done-sum-dia").textContent = D < T ? "Feitas neste dia" : "Feitas";
   if (D < T && done.length) $("#done-dia").open = true;
@@ -587,16 +585,10 @@ function renderCal(){
     row.append(el("span", "mini-mark"), mid, el("span", "mini-time", "repete"));
     return row;
   }));
-  // Adicionar compromisso no dia escolhido
-  const addF = $("#cal-add");
-  addF.hidden = sel < S.today;
-  if (!addF.hidden) $("#cal-add-hint").textContent = sel === S.today
-    ? "Entra direto nas Demandas do dia de hoje."
-    : `Fica em Lembretes e entra sozinho nas Demandas do dia em ${fmtShort(sel)}.`;
   const empty = $("#day-empty");
   empty.hidden = !!(hasClose || other.length || du.length || recs.length);
   empty.textContent = S.data.dia === null ? "Carregando…"
-    : diff > 0 ? "Nada registrado neste dia." : diff === 0 ? "Nada feito hoje ainda. As Demandas do dia e os cards concluídos aparecem aqui." : "Nenhum prazo para este dia.";
+    : diff > 0 ? "Nada registrado neste dia." : diff === 0 ? "Nada feito hoje ainda." : "Nenhum prazo para este dia.";
 }
 function miniRow(i, side, withPrio){
   const b = el("button", "mini");
@@ -617,20 +609,6 @@ function shiftMonth(n){
   S.cal.sel = S.today.startsWith(`${y}-${pad(m+1)}`) ? S.today : `${y}-${pad(m+1)}-01`;
   renderCal();
 }
-$("#cal-add").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = $("#cal-add-in"), texto = input.value.replace(/\s+/g, " ").trim();
-  if (!texto){ input.focus(); return; }
-  const quando = S.cal.sel, prioridade = prioOf($("#cal-add-prio").value), hora = lerHora($("#cal-add-hora"));
-  if (quando < S.today) return;
-  input.value = "";
-  const ok = await write(() => q(sb.from("cards").insert(quando === S.today
-    ? { aba: "dia", texto, quando, hora, prioridade }
-    : { aba: "lembretes", texto, quando, hora, prioridade })));
-  if (ok){ $("#cal-add-prio").value = "media"; $("#cal-add-hora").value = ""; toast(quando === S.today ? "Adicionado às Demandas do dia de hoje." : `Marcado para ${fmtShort(quando)}.`); }
-  else input.value = texto;
-  input.focus();
-});
 $("#cal-prev").addEventListener("click", () => shiftMonth(-1));
 $("#cal-next").addEventListener("click", () => shiftMonth(1));
 $("#cal-today").addEventListener("click", () => { const d = new Date(); S.cal = { y: d.getFullYear(), m: d.getMonth(), sel: S.today }; renderCal(); });
@@ -680,13 +658,22 @@ function renderRotina(){
   markAlta("rotina", itens.map(x => x.item));
   const feitasHoje = [...S.data.dia, ...S.data.lembretes, ...S.data.terceiros].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
   $("#rot-summary").textContent = feitasHoje ? `${feitasHoje} ${feitasHoje === 1 ? "feita" : "feitas"} hoje` : "";
+  if (S.sug && S.sug.dia !== T) S.sug = null;
+  const sugMap = new Map((S.sug ? S.sug.itens : []).map(s => [s.key, s]));
   const comHora = itens.filter(x => x.item.hora && x.item.quando === T);
-  const semHora = itens.filter(x => !(x.item.hora && x.item.quando === T));
+  const sugeridos = itens.filter(x => !(x.item.hora && x.item.quando === T) && sugMap.has(x.item.key))
+    .map(x => { const s = sugMap.get(x.item.key); return { item: x.item, sug: s.hora, motivos: [{ text: `sugerido ${fmtHora(s.hora)} · ~${s.dur} min`, kind: "soon" }, ...x.motivos] }; });
+  const semHora = itens.filter(x => !(x.item.hora && x.item.quando === T) && !sugMap.has(x.item.key));
+  const ativo = !!S.sug;
+  $("#btn-sugerir").hidden = ativo;
+  $("#btn-aplicar").hidden = !ativo; $("#btn-descartar").hidden = !ativo;
+  $("#sug-info").textContent = ativo ? `${sugeridos.length} ${sugeridos.length === 1 ? "horário sugerido" : "horários sugeridos"} no expediente (7h–17h)${S.sug.fora.length ? ` · ${S.sug.fora.length} não ${S.sug.fora.length === 1 ? "coube" : "couberam"} hoje` : ""}` : "";
+  $("#sug-bar").hidden = !itens.length && !ativo;
   const feitosComHora = [...S.data.dia, ...S.data.lembretes].filter(i => i.feito && i.hora && i.quando === T)
     .map(i => ({ item: i, motivos: [{ text: fmtHora(i.hora) }] }));
   empty.hidden = itens.length > 0 || feitosComHora.length > 0;
   empty.textContent = "Nada pendente agora. Quando você criar demandas ou um colega pedir algo, a rotina se monta aqui.";
-  renderAgenda(comHora.concat(feitosComHora));
+  renderAgenda(comHora.concat(feitosComHora, sugeridos));
 
   const grupos = [["Comece por aqui", semHora.slice(0, 3)], ["Em seguida", semHora.slice(3, 8)], ["Se sobrar tempo", semHora.slice(8)]];
   let n = 0;
@@ -698,20 +685,72 @@ function renderRotina(){
     g.append(ol);
     return g;
   });
-  if (blocos.length && (comHora.length || feitosComHora.length)){
+  if (blocos.length && (comHora.length || feitosComHora.length || sugeridos.length)){
     const h = el("h3", "rot-sec", "Sem horário"); h.append(el("small", null, "na ordem sugerida"));
     blocos.unshift(h);
   }
   wrap.replaceChildren(...blocos);
 }
+/* ---------- sugestão de horários (expediente 7h–17h, almoço 12h–13h) ---------- */
+const JORNADA = { inicio: "07:00", fim: "17:00", almoco: ["12:00", "13:00"] };
+const toMin = (h) => { const [a, b] = h.split(":").map(Number); return a * 60 + b; };
+const toHora = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+function duracaoEstimada(i){
+  const t = (i.texto || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/reuni|apresenta|treinament|visita|entrevista|alinhamento/.test(t)) return 60;
+  if (/relatorio|planilha|proposta|orcamento|analise|prospec|apresentacao|contrato|inventario/.test(t)) return 60;
+  if (/ligar|ligacao|telefon|whats|mensagem|e-?mail|responder|retornar|enviar|mandar|avisar|cobrar/.test(t)) return 15;
+  if (/conferir|verificar|revisar|checar|aprovar|assinar|validar/.test(t)) return 30;
+  if (/faturar|nota|lancar|cadastr|emitir|pagar|boleto/.test(t)) return 30;
+  return 30;
+}
+function sugerirHorarios(){
+  const T = S.today, agora = toMin(horaAgora());
+  const ini = toMin(JORNADA.inicio), fim = toMin(JORNADA.fim);
+  let cursor = Math.max(ini, Math.ceil((agora + 5) / 15) * 15);
+  if (cursor >= fim){ toast("O expediente de hoje (7h às 17h) já terminou."); return; }
+  const ocupado = [[toMin(JORNADA.almoco[0]), toMin(JORNADA.almoco[1])]];
+  const timed = [...(S.data.dia || []), ...(S.data.lembretes || []), ...(S.data.terceiros || [])].filter(i => !i.feito && i.hora && i.quando === T);
+  for (const i of timed){ const m = toMin(i.hora); ocupado.push([m, m + duracaoEstimada(i)]); }
+  ocupado.sort((a, b) => a[0] - b[0]);
+  const cabe = (m, d) => m + d <= fim && !ocupado.some(([a, b]) => m < b && m + d > a);
+  const itens = rotinaItens().filter(x => !(x.item.hora && x.item.quando === T));
+  const sug = [], fora = [];
+  for (const x of itens){
+    const d = duracaoEstimada(x.item);
+    let m = cursor; // prioridade maior pega o primeiro horário livre; as menores preenchem as brechas
+    while (m < fim && !cabe(m, d)) m += 15;
+    if (m >= fim){ fora.push(x.item.key); continue; }
+    sug.push({ key: x.item.key, hora: toHora(m), dur: d });
+    ocupado.push([m, m + d]); ocupado.sort((a, b) => a[0] - b[0]);
+  }
+  if (!sug.length){ toast(itens.length ? "Não sobrou espaço livre no expediente de hoje." : "Não há demandas sem horário para encaixar."); return; }
+  S.sug = { dia: T, itens: sug, fora };
+  renderRotina();
+}
+async function aplicarSugestao(){
+  const sg = S.sug; if (!sg) return;
+  const lista = sg.itens.map(x => ({ x, i: findItem(x.key) })).filter(o => o.i && !o.i.feito);
+  S.sug = null;
+  const ok = await write(async () => {
+    for (const { x, i } of lista) await patchItem(i, { hora: x.hora, quando: sg.dia });
+  });
+  if (ok) toast(`${lista.length} ${lista.length === 1 ? "horário aplicado" : "horários aplicados"}. Você recebe o aviso por e-mail em cada um.`);
+  renderRotina();
+}
+$("#btn-sugerir").addEventListener("click", sugerirHorarios);
+$("#btn-aplicar").addEventListener("click", aplicarSugestao);
+$("#btn-descartar").addEventListener("click", () => { S.sug = null; renderRotina(); });
+
 function renderAgenda(lista){
   const box = $("#rot-agenda");
   if (!lista.length){
-    box.replaceChildren(el("p", "rot-agenda-vazia", "Coloque um horário num lembrete, num card ou pelo calendário para montar a agenda do dia aqui."));
+    box.replaceChildren(el("p", "rot-agenda-vazia", "Nenhum horário marcado para hoje."));
     return;
   }
-  const hr = (x) => parseInt(x.item.hora.slice(0, 2), 10);
-  const ini = Math.min(8, ...lista.map(hr)), fim = Math.max(18, ...lista.map(hr));
+  const hx = (x) => x.sug || x.item.hora;
+  const hr = (x) => parseInt(hx(x).slice(0, 2), 10);
+  const ini = Math.min(7, ...lista.map(hr)), fim = Math.max(16, ...lista.map(hr));
   const agoraH = new Date().getHours();
   const grade = el("div", "agenda");
   for (let h = ini; h <= fim; h++){
@@ -719,7 +758,7 @@ function renderAgenda(lista){
     const lab = el("span", "ag-hora", pad(h) + "h00");
     if (h === agoraH) lab.append(el("small", null, "agora"));
     const slot = el("div", "ag-slot");
-    const daHora = lista.filter(x => hr(x) === h).sort((a, b) => a.item.hora.localeCompare(b.item.hora));
+    const daHora = lista.filter(x => hr(x) === h).sort((a, b) => hx(a).localeCompare(hx(b)));
     if (daHora.length){ const ul = el("ul", "rot-list"); daHora.forEach(x => ul.append(rotItem(x, null))); slot.append(ul); }
     row.append(lab, slot);
     grade.append(row);
@@ -728,7 +767,7 @@ function renderAgenda(lista){
 }
 function rotItem(x, n){
   const i = x.item;
-  const li = el("li", "rot-item" + (i.prioridade === "alta" && !i.feito ? " is-alta" : "") + (n == null ? " sem-num" : "") + (i.feito ? " is-done" : ""));
+  const li = el("li", "rot-item" + (i.prioridade === "alta" && !i.feito ? " is-alta" : "") + (n == null ? " sem-num" : "") + (i.feito ? " is-done" : "") + (x.sug ? " is-sug" : ""));
   li.dataset.tab = i.tab;
   const body = el("button", "rot-body"); body.type = "button";
   body.append(el("span", "rot-text", i.texto || "Sem título"));
@@ -894,10 +933,6 @@ function openEditor(key){
   ED.title.value = i.texto; ED.notes.innerHTML = toHtml(i.notas); notesEmptyState();
   ED.title.readOnly = !canEditTitle(i);
   ED.notes.dataset.placeholder = "Anote aqui tudo sobre esta demanda: contatos, valores, prazos, próximos passos…";
-  const hint = $("#ed-hint");
-  hint.hidden = !isPedidoTab(i.tab);
-  hint.textContent = i.tab === "terceiros" ? `${nomeDe(i.de)} também vê estas anotações. Só quem pediu muda o título.`
-    : i.tab === "enviados" ? `${nomeDe(i.para)} também vê e pode anotar aqui.` : "";
   $("#ed-date-wrap").hidden = false;
   $("#ed-hora-wrap").hidden = false;
   const del = $("#ed-delete");
