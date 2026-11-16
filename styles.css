@@ -599,3 +599,12 @@ select.field{appearance:auto;padding-right:8px}
   .add.enviar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"s s" "t t" "n n" "p p" "d h" "b b"}
   .add.enviar .a-d,.add.enviar .a-h{width:100%}
 }
+
+/* ── Sugestão de horários ── */
+.sug-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 16px}
+.sug-bar .btn{height:40px}
+.sug-bar .btn-sec{height:40px;background:var(--accent);color:#fff}
+.sug-info{font-size:13px;color:var(--text-muted)}
+.rot-item.is-sug{border-style:dashed;border-color:var(--accent);background:rgba(240,122,31,.07)}
+.sheet-head{margin-bottom:16px}
+.add{margin-bottom:18px}

@@ -99,12 +99,16 @@
     <div class="sheet-head">
       <div>
         <h2>Rotina</h2>
-        <p>A ordem sugerida para hoje, montada sozinha com o que ficou pendente, os lembretes que vencem e os pedidos dos colegas.</p>
       </div>
       <span class="progress" id="rot-summary"></span>
     </div>
-    <p class="tip">A agenda mostra o que tem horário hoje, e você recebe um e-mail na hora marcada. Abaixo, o que não tem horário vem na ordem sugerida, pela prioridade, pelos prazos e por há quanto tempo está esperando.</p>
     <p class="empty" id="empty-rotina">Carregando…</p>
+    <div class="sug-bar" id="sug-bar">
+      <button class="btn" type="button" id="btn-sugerir">Sugerir horários</button>
+      <span class="sug-info" id="sug-info"></span>
+      <button class="btn-sec" type="button" id="btn-aplicar" hidden>Aplicar horários</button>
+      <button class="link-btn" type="button" id="btn-descartar" hidden>Descartar</button>
+    </div>
     <div id="rot-agenda"></div>
     <div id="rot-groups"></div>
   </section>
@@ -114,7 +118,6 @@
     <div class="sheet-head">
       <div>
         <h2>Lembretes</h2>
-        <p>Coisas que não podemos esquecer. Coloque uma data se tiver prazo.</p>
       </div>
     </div>
     <form class="add" id="form-lembretes" autocomplete="off">
@@ -143,17 +146,15 @@
         <label class="rep-field">Até <input class="field" type="date" id="rep-fim"> <small>(opcional)</small></label>
       </div>
     </form>
-    <p class="tip">Lembretes com data entram sozinhos nas Demandas do dia quando a data chega. Use <b>Repetir</b> para algo que acontece todo dia, em dias da semana ou todo mês, como uma reunião em dezembro.</p>
     <p class="empty" id="empty-lembretes">Carregando…</p>
     <div class="grid" id="list-lembretes"></div>
     <details class="done" id="done-lembretes" hidden>
       <summary><span>Resolvidos (<span id="done-count-lembretes">0</span>)</span></summary>
-      <div class="done-tools"><p>Arquivados saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="lembretes">Arquivar resolvidos</button></div>
+      <div class="done-tools"><button class="link-btn" type="button" data-archive="lembretes">Arquivar resolvidos</button></div>
       <div class="grid" id="done-list-lembretes"></div>
     </details>
     <details class="done" id="rec-wrap" hidden>
       <summary><span>Lembretes recorrentes (<span id="rec-count">0</span>)</span></summary>
-      <p class="done-tools"><span>Lembretes que entram sozinhos em Demandas do dia nos dias escolhidos.</span></p>
       <div class="rec-list" id="rec-list"></div>
     </details>
   </section>
@@ -163,13 +164,10 @@
     <div class="sheet-head">
       <div>
         <h2>Demandas do dia</h2>
-        <p>O que precisa ser feito hoje. O que ficar pendente continua aqui amanhã.</p>
       </div>
       <span class="progress" id="progress-dia"></span>
     </div>
     <div class="day-nav">
-      <button class="icon-btn" type="button" id="dia-prev" aria-label="Dia anterior"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg></button>
-      <button class="icon-btn" type="button" id="dia-next" aria-label="Próximo dia"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4.5L13 10l-5.5 5.5"/></svg></button>
       <span class="day-nav-label" id="dia-label" aria-live="polite"></span>
       <button class="link-btn" type="button" id="dia-hoje" hidden>Voltar para hoje</button>
     </div>
@@ -182,12 +180,11 @@
       <input class="field" type="time" id="hora-dia" title="Horário (opcional)">
       <button class="btn" type="submit">Criar card</button>
     </form>
-    <p class="tip" id="tip-dia">Clique num card para anotar os detalhes. Arraste um card até outra aba para movê-lo.</p>
     <p class="empty" id="empty-dia">Carregando…</p>
     <div class="grid" id="list-dia"></div>
     <details class="done" id="done-dia" hidden>
       <summary><span><span id="done-sum-dia">Feitas</span> (<span id="done-count-dia">0</span>)</span></summary>
-      <div class="done-tools" id="tools-dia"><p>As feitas de hoje ficam aqui; amanhã elas aparecem só no dia em que foram concluídas.</p><button class="link-btn" type="button" data-archive="dia">Arquivar agora</button></div>
+      <div class="done-tools" id="tools-dia"><button class="link-btn" type="button" data-archive="dia">Arquivar agora</button></div>
       <div class="grid" id="done-list-dia"></div>
     </details>
   </section>
@@ -197,7 +194,6 @@
     <div class="sheet-head">
       <div>
         <h2>Demandas de terceiros</h2>
-        <p>Peça algo a um colega e acompanhe o que pediram para você.</p>
       </div>
     </div>
 
@@ -217,20 +213,18 @@
         <input class="field a-h" type="time" id="hora-enviar" title="Prazo: horário (opcional)">
         <button class="btn a-b" type="submit">Enviar</button>
       </form>
-      <p class="tip" id="tip-enviar">O colega vê o pedido aqui na aba dele e recebe um aviso por e-mail. Com prazo e horário, ele também recebe um e-mail na hora marcada. Você acompanha logo abaixo, em Enviadas por mim.</p>
     </div>
 
-    <h3 class="secao">Pedidos para mim <small>o que os colegas pediram para você</small></h3>
-    <p class="tip">Arraste um card até Lembretes ou Demandas do dia para encaixar na sua rotina.</p>
+    <h3 class="secao">Pedidos para mim</h3>
     <p class="empty" id="empty-terceiros">Carregando…</p>
     <div class="grid" id="list-terceiros"></div>
     <details class="done" id="done-terceiros" hidden>
       <summary><span>Concluídas por mim (<span id="done-count-terceiros">0</span>)</span></summary>
-      <div class="done-tools"><p>Arquivadas saem desta aba, mas continuam no calendário.</p><button class="link-btn" type="button" data-archive="terceiros">Arquivar concluídas</button></div>
+      <div class="done-tools"><button class="link-btn" type="button" data-archive="terceiros">Arquivar concluídas</button></div>
       <div class="grid" id="done-list-terceiros"></div>
     </details>
 
-    <h3 class="secao">Enviadas por mim <small>o que você pediu aos colegas</small></h3>
+    <h3 class="secao">Enviadas por mim</h3>
     <p class="empty" id="empty-enviados">Carregando…</p>
     <div class="grid" id="list-enviados"></div>
     <details class="done" id="done-enviados" hidden>
@@ -244,7 +238,6 @@
     <div class="sheet-head">
       <div>
         <h2>Calendário</h2>
-        <p>O que você concluiu em cada dia, e os prazos que vêm pela frente. Clique num dia para ver.</p>
       </div>
       <span class="progress" id="cal-summary"></span>
     </div>
@@ -271,16 +264,6 @@
       <div class="day" aria-live="polite">
         <h3 id="day-title"></h3>
         <p class="day-sub" id="day-sub"></p>
-        <form class="cal-add" id="cal-add" autocomplete="off" hidden>
-          <label class="sr" for="cal-add-in">Adicionar neste dia</label>
-          <input class="field" id="cal-add-in" maxlength="280" placeholder="Marcar neste dia, ex.: Reunião com o cliente X">
-          <label class="sr" for="cal-add-hora">Horário (opcional)</label>
-          <input class="field" type="time" id="cal-add-hora" title="Horário (opcional)">
-          <label class="sr" for="cal-add-prio">Prioridade</label>
-          <select class="field" id="cal-add-prio"><option value="alta">Alta</option><option value="media" selected>Média</option><option value="baixa">Baixa</option></select>
-          <button class="btn" type="submit">Marcar</button>
-          <p class="cal-add-hint" id="cal-add-hint"></p>
-        </form>
         <div id="close-wrap">
           <h4 id="close-title">Fechamento das demandas do dia</h4>
           <div class="close-bar" aria-hidden="true"><span id="close-fill"></span></div>
@@ -332,8 +315,6 @@
         <button type="button" data-cmd="removeFormat" title="Limpar formatação" aria-label="Limpar formatação"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10M10 4l-3 12M4 16l12-12" /></svg></button>
       </div>
       <div class="ed-notes" id="ed-notes" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="ed-notes-label" spellcheck="true"></div>
-      <p class="ed-files-hint">Atalhos: comece a linha com <b>-</b> e espaço para lista, <b>1.</b> para lista numerada, <b>[]</b> para tarefa. Tab recua um item da lista.</p>
-      <p class="ed-hint" id="ed-hint"></p>
       <div class="ed-files">
         <div class="ed-files-head">
           <span class="ed-notes-label">Anexos <span id="ed-anexos-count"></span></span>
@@ -341,7 +322,6 @@
           <input type="file" id="ed-file" multiple hidden>
         </div>
         <div class="anexos" id="ed-anexos"></div>
-        <p class="ed-files-hint">Também dá para colar uma imagem (Ctrl+V) ou arrastar arquivos para cá. Até 10 MB por arquivo.</p>
       </div>
     </div>
     <div class="ed-foot">
