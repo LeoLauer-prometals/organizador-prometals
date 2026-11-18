@@ -52,7 +52,18 @@ function when(ts){
 }
 function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 function longDay(iso){ return cap(parseDay(iso).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })); }
-function setToday(){ $("#today").textContent = cap(new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })); }
+function setToday(){
+  const d = cap(new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+  $("#today").textContent = S.lastSync ? `${d} · dados atualizados às ${hm(S.lastSync)}` : d;
+  const h = new Date().getHours(), me = S.me && S.perfis[S.me.id];
+  const nome = ((me && me.nome) || "").trim().split(/\s+/)[0];
+  $("#hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (nome ? `, ${nome}` : "");
+}
+function marcarSync(){
+  S.lastSync = new Date();
+  $("#sync-time").textContent = "Última sincronização " + S.lastSync.toLocaleTimeString("pt-BR");
+  setToday();
+}
 const fmtHora = (h) => h ? String(h).slice(0, 5).replace(":", "h") : "";
 const lerHora = (el) => /^\d\d:\d\d/.test(el.value || "") ? el.value.slice(0, 5) : null;
 const horaAgora = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -186,6 +197,7 @@ async function reloadAll(){
     await Promise.all([loadCards(), loadPedidos(), loadRecorrencias()]);
     await autoMoveLembretes();
     await gerarRecorrencias();
+    marcarSync();
     renderAll(); syncEditor();
     $("#banner").hidden = true;
   } catch (e){
@@ -657,6 +669,7 @@ function renderRotina(){
   const itens = rotinaItens();
   $("#count-rotina").textContent = itens.length;
   markAlta("rotina", itens.map(x => x.item));
+  renderKpis();
   const feitasHoje = [...S.data.dia, ...S.data.lembretes, ...S.data.terceiros].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
   $("#rot-summary").textContent = feitasHoje ? `${feitasHoje} ${feitasHoje === 1 ? "feita" : "feitas"} hoje` : "";
   if (S.sug && S.sug.dia !== T) S.sug = null;
@@ -742,6 +755,33 @@ async function aplicarSugestao(){
 $("#btn-sugerir").addEventListener("click", sugerirHorarios);
 $("#btn-aplicar").addEventListener("click", aplicarSugestao);
 $("#btn-descartar").addEventListener("click", () => { S.sug = null; renderRotina(); });
+
+function renderKpis(){
+  const T = S.today, dia = S.data.dia || [], lem = S.data.lembretes || [], ter = S.data.terceiros || [];
+  const pend = dia.filter(i => !i.feito && (!i.quando || i.quando <= T) && !vencidoRec(i, T));
+  const comHora = pend.filter(i => i.hora && i.quando === T).length;
+  $("#kpi-pend").textContent = pend.length;
+  $("#kpi-pend-sub").textContent = comHora ? `${comHora} com horário marcado` : "nenhuma com horário";
+  const feitas = [...dia, ...lem, ...ter].filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
+  const fDia = dia.filter(i => i.feito && i.feitoEm && dayOf(i.feitoEm) === T).length;
+  $("#kpi-feitas").textContent = feitas;
+  $("#kpi-feitas-sub").textContent = `${fDia} de ${fDia + pend.length} das demandas do dia`;
+  const ped = ter.filter(i => !i.feito);
+  const altas = ped.filter(i => i.prioridade === "alta").length;
+  $("#kpi-ped").textContent = ped.length;
+  $("#kpi-ped-sub").textContent = altas ? `${altas} de prioridade alta` : "nenhum de prioridade alta";
+  const agora = horaAgora();
+  const venceu = (i) => i.quando && (i.quando < T || (i.quando === T && i.hora && i.hora <= agora));
+  const atr = [
+    ...pend.filter(i => venceu(i) || (!i.quando && i.criadoEm && dayOf(i.criadoEm) < T)),
+    ...lem.filter(i => !i.feito && venceu(i)),
+    ...ter.filter(i => !i.feito && venceu(i) && !copiesOf(i).length)
+  ].length;
+  $("#kpi-atr").textContent = atr;
+  $("#kpi-atr-sub").textContent = atr ? "prazo passou ou vieram de dias anteriores" : "tudo em dia";
+  $("#kpis").classList.toggle("tem-atraso", atr > 0);
+}
+document.querySelectorAll("#kpis [data-go]").forEach(b => b.addEventListener("click", () => { activate(b.dataset.go, false); window.scrollTo({ top: 0 }); }));
 
 function renderAgenda(lista){
   const box = $("#rot-agenda");
@@ -1460,6 +1500,8 @@ function activate(tab, focus){
     p.hidden = !on; p.classList.toggle("is-first", S.visible[0] === t);
   }
   storeSet("org.aba", tab);
+  $("#crumb").textContent = NOMES[tab];
+  $("#kpis").hidden = tab !== "rotina";
   try { $("#tab-" + tab).scrollIntoView({ block: "nearest", inline: "nearest" }); } catch {}
   try { history.replaceState(null, "", "#" + tab); } catch {}
   if (tab === "calendario") renderCal();
@@ -1583,7 +1625,11 @@ async function start(user){
   renderAll();
   try { await loadPerfis(); } catch (e){ console.warn(e); }
   const me = S.perfis[user.id];
-  const nameEl = $("#user-name"); nameEl.replaceChildren(avatarEl(user.id), el("span", null, (me && me.nome) || user.email));
+  $("#user-name").textContent = (me && me.nome) || user.email;
+  $("#user-mail").textContent = user.email || "";
+  $("#user-av").textContent = (((me && me.nome) || user.email || "?").trim()[0] || "?").toUpperCase();
+  $("#sb-sessao").textContent = "Sessão: " + (user.email || "");
+  setToday();
   await reloadAll();
   subscribe();
 }
