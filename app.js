@@ -821,7 +821,7 @@ function rotItem(x, n){
   if (plainText(i.notas).trim()) body.append(el("span", "rot-notes", plainText(i.notas).trim().split("\n")[0]));
   body.addEventListener("click", () => openEditor(i.key));
   if (n != null) li.append(el("span", "rot-num", String(n)));
-  li.append(checkBtn(i, true), body);
+  li.append(body);
   return li;
 }
 
@@ -977,6 +977,8 @@ function openEditor(key){
   $("#ed-date-wrap").hidden = false;
   $("#ed-hora-wrap").hidden = false;
   const del = $("#ed-delete");
+  pedirConfirmacao(false);
+  document.querySelector(".ed-check").hidden = S.active === "rotina";
   del.textContent = i.tab === "terceiros" ? "Remover da minha lista" : i.tab === "enviados" ? "Excluir pedido" : "Excluir card";
   setEdSaved("");
   refreshEditorMeta();
@@ -1355,7 +1357,20 @@ window.addEventListener("drop", (e) => { if (S.ed) e.preventDefault(); });
 
 $("#ed-close").addEventListener("click", () => closeEditor());
 ED.modal.querySelector("[data-close]").addEventListener("click", () => closeEditor());
-$("#ed-delete").addEventListener("click", async () => {
+function pedirConfirmacao(on){
+  $("#ed-delete").hidden = on;
+  $("#ed-confirm").hidden = !on;
+  if (on){
+    const i = S.ed && S.ed.item;
+    $("#ed-confirm-txt").textContent = i && i.tab === "terceiros" ? "Remover este pedido da sua lista?"
+      : i && i.tab === "enviados" ? "Excluir este pedido? O colega deixa de ver." : "Excluir este card?";
+    $("#ed-confirm-ok").focus();
+  }
+}
+$("#ed-delete").addEventListener("click", () => pedirConfirmacao(true));
+$("#ed-confirm-no").addEventListener("click", () => { pedirConfirmacao(false); $("#ed-delete").focus(); });
+$("#ed-confirm-ok").addEventListener("click", async () => {
+  pedirConfirmacao(false);
   const it = await closeEditor(); if (!it) return;
   if (it.tab === "terceiros") removeRecebido(it);
   else if (it.tab === "enviados") removeEnviado(it);

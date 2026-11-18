@@ -731,3 +731,16 @@ body{font-family:"Segoe UI",Arial,sans-serif}
 @media (max-width:900px){ .app.shell{grid-template-columns:minmax(0,1fr)} }
 .app.shell{grid-template-columns:278px minmax(0,1fr)}
 @media (max-width:900px){ .app.shell{grid-template-columns:minmax(0,1fr)} }
+/* contador vermelho quando há prioridade alta (sem bolinha) */
+.tab .tab-alert,.side .tab .tab-alert{display:none!important}
+.tab.has-alta .count,.side .tab.has-alta .count{background:var(--p-alta);color:#fff}
+/* Rotina sem caixinha de concluir */
+.rot-item{grid-template-columns:26px minmax(0,1fr)}
+.rot-item.sem-num{grid-template-columns:minmax(0,1fr)}
+@media (max-width:600px){ .rot-item{grid-template-columns:auto minmax(0,1fr)} .rot-item.sem-num{grid-template-columns:minmax(0,1fr)} }
+/* confirmação de exclusão */
+.ed-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-left:auto}
+.ed-confirm span{font-size:13px;font-weight:600;color:#fca5a5}
+.ed-confirm .btn,.ed-confirm .btn-sec{height:34px;padding:0 14px;font-size:13px}
+.btn-danger{background:#b91c1c;color:#fff}
+.btn-danger:hover{background:#991b1b;filter:none}
